@@ -1,0 +1,2 @@
+[console_scripts]
+delcred = delcred.cli:main

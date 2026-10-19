@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "delcred"
+version = "0.2.0"
+description = "Short-lived, per-task, per-user-scoped credentials for AI agents — RFC 8693 delegation + ephemeral API-key broker"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+authors = [{ name = "Calas Automations Inc." }]
+keywords = ["agents", "oauth", "delegation", "credentials", "zero-trust", "rfc8693"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Security",
+]
+dependencies = [
+    "PyJWT>=2.8",
+    "cryptography>=41",
+    "PyYAML>=6",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.scripts]
+delcred = "delcred.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["delcred*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
