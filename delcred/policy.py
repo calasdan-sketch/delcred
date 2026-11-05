@@ -65,7 +65,8 @@ class Policy:
         if grant is None:
             raise PolicyError(
                 f"no delegation grant for user={user!r} agent={agent!r} "
-                "(deny by default)"
+                "(deny by default)",
+                code="no_grant",
             )
         if not isinstance(scope, str) or not isinstance(resource, str):
             raise PolicyError("scope and resource must be strings")
@@ -74,16 +75,18 @@ class Policy:
             # Finding #8: a scope-less delegation is almost certainly a
             # caller bug; fail closed rather than mint a bearer token
             # with no stated purpose.
-            raise PolicyError("scope must not be empty")
+            raise PolicyError("scope must not be empty", code="scope")
         unknown = wanted - grant.scopes
         if unknown:
             raise PolicyError(
                 f"scope(s) not granted: {sorted(unknown)} "
-                f"(grant allows: {sorted(grant.scopes)})"
+                f"(grant allows: {sorted(grant.scopes)})",
+                code="scope",
             )
         if resource not in grant.resources:
             raise PolicyError(
-                f"resource {resource!r} not granted (grant allows: {grant.resources})"
+                f"resource {resource!r} not granted (grant allows: {grant.resources})",
+                code="resource",
             )
         if ttl <= 0:
             raise PolicyError("ttl must be positive")
@@ -94,7 +97,17 @@ class Policy:
 
 
 class PolicyError(Exception):
-    pass
+    """A delegation request is not permitted.
+
+    ``code`` maps the denial to an OAuth error (used by the RFC 8693
+    ``/token`` endpoint): ``no_grant`` → ``invalid_grant``, ``scope`` →
+    ``invalid_scope``, ``resource`` → ``invalid_target``, ``request`` →
+    ``invalid_request``.
+    """
+
+    def __init__(self, message: str, code: str = "request"):
+        super().__init__(message)
+        self.code = code
 
 
 def policy_path(base: Path | None = None) -> Path:

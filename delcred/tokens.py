@@ -44,6 +44,35 @@ class InvalidToken(TokenError):
     pass
 
 
+class InsufficientScope(TokenError):
+    """The token is valid but lacks scopes the operation requires.
+
+    Maps to HTTP 403 + ``WWW-Authenticate: Bearer error="insufficient_scope"``
+    (RFC 6750 §3.1, MCP authorization spec). ``required``/``missing`` are
+    sorted lists of scope strings.
+    """
+
+    def __init__(self, required: list[str], missing: list[str], granted: list[str]):
+        self.required = required
+        self.missing = missing
+        self.granted = granted
+        super().__init__(f"insufficient scope: missing {missing} (token grants {granted})")
+
+
+def normalize_scopes(scopes: str | list[str] | set[str] | tuple[str, ...] | None) -> set[str]:
+    """Accept ``"a b"`` or ``["a", "b"]`` → ``{"a", "b"}`` (whitespace-split)."""
+    if scopes is None:
+        return set()
+    if isinstance(scopes, str):
+        return set(scopes.split())
+    out: set[str] = set()
+    for s in scopes:
+        if not isinstance(s, str):
+            raise TypeError("scopes must be strings")
+        out.update(s.split())
+    return out
+
+
 def _now() -> int:
     return int(time.time())
 
@@ -58,6 +87,13 @@ def _signing_key_pem(priv: Ed25519PrivateKey) -> bytes:
         serialization.PrivateFormat.PKCS8,
         serialization.NoEncryption(),
     )
+
+
+def _headers(priv: Ed25519PrivateKey, typ: str | None = None) -> dict[str, str]:
+    h = {"kid": _keys.key_id(priv.public_key())}
+    if typ:
+        h["typ"] = typ
+    return h
 
 
 def mint_delegation_token(
@@ -95,7 +131,7 @@ def mint_delegation_token(
         claims,
         _signing_key_pem(priv),
         algorithm="EdDSA",
-        headers={"typ": "at+jwt"},
+        headers=_headers(priv, "at+jwt"),
     )
 
 
@@ -112,7 +148,9 @@ def mint_agent_token(agent_id: str, ttl: int = 86400, base: Path | None = None) 
         "exp": now + ttl,
     }
     priv = _keys.load_private(base)
-    return jwt.encode(claims, _signing_key_pem(priv), algorithm="EdDSA")
+    return jwt.encode(
+        claims, _signing_key_pem(priv), algorithm="EdDSA", headers=_headers(priv)
+    )
 
 
 def mint_user_token(user_id: str, ttl: int = 3600, base: Path | None = None) -> str:
@@ -128,7 +166,9 @@ def mint_user_token(user_id: str, ttl: int = 3600, base: Path | None = None) -> 
         "exp": now + ttl,
     }
     priv = _keys.load_private(base)
-    return jwt.encode(claims, _signing_key_pem(priv), algorithm="EdDSA")
+    return jwt.encode(
+        claims, _signing_key_pem(priv), algorithm="EdDSA", headers=_headers(priv)
+    )
 
 
 def decode_unverified(token: str) -> dict[str, Any]:
@@ -167,6 +207,12 @@ def _key_for_issuer(token: str, base: Path | None) -> tuple[bytes, list[str], st
     iss = unverified.get("iss")
     if iss == ISSUER_ID:
         pub = _keys.load_public(base)
+        kid = headers.get("kid")
+        if kid is not None and kid != _keys.key_id(pub):
+            raise InvalidToken(
+                "token was signed by a different issuer key (kid mismatch) — "
+                "the key was rotated or the token comes from another delcred home"
+            )
         pem = pub.public_bytes(
             serialization.Encoding.PEM,
             serialization.PublicFormat.SubjectPublicKeyInfo,
@@ -187,11 +233,6 @@ def _key_for_issuer(token: str, base: Path | None) -> tuple[bytes, list[str], st
         serialization.PublicFormat.SubjectPublicKeyInfo,
     )
     return pem, ["exp", "iss", "sub"], iss
-    """Decode claims without verifying — for inspection only, never trust."""
-    try:
-        return jwt.decode(token, options={"verify_signature": False})
-    except jwt.PyJWTError as e:
-        raise InvalidToken(f"malformed token: {e}") from e
 
 
 def verify_signature(
@@ -237,10 +278,13 @@ def verify_delegation_token(
     token: str,
     *,
     expected_resource: str | None = None,
+    required_scopes: str | list[str] | set[str] | None = None,
     leeway: int = CLOCK_SKEW_LEEWAY,
     base: Path | None = None,
 ) -> dict[str, Any]:
-    """Verify a delegation token and enforce audience pinning (confused-deputy defense)."""
+    """Verify a delegation token, enforce audience pinning (confused-deputy
+    defense) and, if given, that every ``required_scopes`` entry is granted
+    (least privilege per operation; raises :class:`InsufficientScope`)."""
     claims = verify_signature(token, leeway=leeway, base=base)
     if claims.get("kind") != "delegation":
         raise InvalidToken(f"not a delegation token (kind={claims.get('kind')!r})")
@@ -251,6 +295,12 @@ def verify_delegation_token(
             f"audience mismatch: token is for {claims.get('aud')!r}, "
             f"not {expected_resource!r}"
         )
+    need = normalize_scopes(required_scopes)
+    if need:
+        have = scopes_of(claims)
+        missing = need - have
+        if missing:
+            raise InsufficientScope(sorted(need), sorted(missing), sorted(have))
     return claims
 
 

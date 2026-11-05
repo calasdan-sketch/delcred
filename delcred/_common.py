@@ -27,7 +27,14 @@ def home() -> Path:
 
 
 def assert_private(path: Path) -> None:
-    """Refuse to use a private key file that is readable by group/other."""
+    """Refuse to use a private key file that is readable by group/other.
+
+    On Windows, POSIX mode bits are not meaningful (access is governed by
+    NTFS ACLs, which a user profile directory already restricts), so the
+    check is skipped there — see README "Limitations".
+    """
+    if os.name == "nt":  # pragma: no cover
+        return
     mode = stat.S_IMODE(path.stat().st_mode)
     if mode & 0o077:
         raise PermissionError(

@@ -1,6 +1,6 @@
 """Revocation: instant local denylist.
 
-Entries are JSONL rows, append-only, fcntl-locked for atomic multi-process
+Entries are JSONL rows, append-only, file-locked (POSIX flock / Windows msvcrt) for atomic multi-process
 updates::
 
     {"type": "jti",   "jti": "...", "revoked_at": 169..., "reason": "...",
@@ -15,7 +15,6 @@ revocation sync is an explicit v1 non-goal (see README Limitations).
 
 from __future__ import annotations
 
-import fcntl
 import json
 import os
 import threading
@@ -24,12 +23,13 @@ from pathlib import Path
 from typing import Any
 
 from ._common import home
+from ._lock import atomic_rewrite, file_lock
 
-# fcntl locks are process-associated: two threads of the SAME process holding
-# "exclusive" fcntl locks on different fds do NOT exclude each other (POSIX).
-# This module-level lock provides the intra-process half of mutual exclusion;
-# fcntl provides the inter-process half. Every file mutation/read below takes
-# both (thread lock outermost — never nest them).
+# OS file locks are process-associated: two threads of the SAME process do
+# NOT exclude each other through them. This module-level lock provides the
+# intra-process half of mutual exclusion; ``_lock.file_lock`` provides the
+# inter-process half (POSIX flock / Windows msvcrt). Every file mutation/read
+# below takes both (thread lock outermost — never nest them).
 _thread_lock = threading.Lock()
 
 
@@ -45,14 +45,12 @@ class RevocationList:
     # -- mutation (locked, atomic append) ---------------------------------
 
     def _append(self, entry: dict[str, Any]) -> None:
-        with _thread_lock, open(self.path, "a") as f:
-            fcntl.flock(f, fcntl.LOCK_EX)
-            try:
-                f.write(json.dumps(entry) + "\n")
-                f.flush()
-                os.fsync(f.fileno())
-            finally:
-                fcntl.flock(f, fcntl.LOCK_UN)
+        with _thread_lock, file_lock(self.path), open(
+            self.path, "a", encoding="utf-8"
+        ) as f:
+            f.write(json.dumps(entry) + "\n")
+            f.flush()
+            os.fsync(f.fileno())
 
     def revoke_jti(
         self, jti: str, reason: str = "", expires_at: int | None = None
@@ -91,58 +89,54 @@ class RevocationList:
         rejected. This is what makes single-use credentials actually
         single-use across processes.
         """
-        with _thread_lock, open(self.path, "a+") as f:
-            fcntl.flock(f, fcntl.LOCK_EX)
-            try:
-                f.seek(0)
-                now = _now()
-                for line in f:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        e = json.loads(line)
-                    except json.JSONDecodeError:
-                        continue
-                    if e.get("type") != "jti" or e.get("jti") != jti:
-                        continue
-                    exp = e.get("expires_at")
-                    if exp is None or exp >= now:
-                        return False  # already denylisted
-                f.write(
-                    json.dumps(
-                        {
-                            "type": "jti",
-                            "jti": jti,
-                            "revoked_at": now,
-                            "reason": reason,
-                            "expires_at": expires_at,
-                        }
-                    )
-                    + "\n"
+        with _thread_lock, file_lock(self.path), open(
+            self.path, "a+", encoding="utf-8"
+        ) as f:
+            f.seek(0)
+            now = _now()
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    e = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if e.get("type") != "jti" or e.get("jti") != jti:
+                    continue
+                exp = e.get("expires_at")
+                if exp is None or exp >= now:
+                    return False  # already denylisted
+            f.write(
+                json.dumps(
+                    {
+                        "type": "jti",
+                        "jti": jti,
+                        "revoked_at": now,
+                        "reason": reason,
+                        "expires_at": expires_at,
+                    }
                 )
-                f.flush()
-                os.fsync(f.fileno())
-                return True
-            finally:
-                fcntl.flock(f, fcntl.LOCK_UN)
+                + "\n"
+            )
+            f.flush()
+            os.fsync(f.fileno())
+            return True
 
     # -- reads ------------------------------------------------------------
 
     def _entries(self) -> list[dict[str, Any]]:
         rows = []
-        with _thread_lock, open(self.path) as f:
-            fcntl.flock(f, fcntl.LOCK_SH)
-            try:
-                for line in f:
-                    line = line.strip()
-                    if line:
-                        try:
-                            rows.append(json.loads(line))
-                        except json.JSONDecodeError:
-                            continue
-            finally:
-                fcntl.flock(f, fcntl.LOCK_UN)
+        with _thread_lock, file_lock(self.path, shared=True), open(
+            self.path, encoding="utf-8"
+        ) as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    try:
+                        rows.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        continue
         return rows
 
     def is_revoked(self, claims: dict[str, Any]) -> tuple[bool, str]:
@@ -182,11 +176,9 @@ class RevocationList:
         are never lost to the replace.
         """
         now = _now()
-        with _thread_lock, open(self.path, "a+") as f:
-            fcntl.flock(f, fcntl.LOCK_EX)
-            try:
-                f.seek(0)
-                kept, dropped = [], 0
+        with _thread_lock, file_lock(self.path):
+            kept, dropped = [], 0
+            with open(self.path, encoding="utf-8") as f:
                 for line in f:
                     line = line.strip()
                     if not line:
@@ -199,17 +191,10 @@ class RevocationList:
                     if e.get("type") == "jti" and exp is not None and exp < now:
                         dropped += 1
                         continue
-                    kept.append(e)
-                if dropped:
-                    tmp = self.path.with_suffix(".tmp")
-                    with open(tmp, "w") as tf:
-                        for e in kept:
-                            tf.write(json.dumps(e) + "\n")
-                        tf.flush()
-                        os.fsync(tf.fileno())
-                    # The lock is held on the original fd; the replace is
-                    # atomic and no concurrent writer can slip between.
-                    os.replace(tmp, self.path)
-                return dropped
-            finally:
-                fcntl.flock(f, fcntl.LOCK_UN)
+                    kept.append(json.dumps(e))
+            if dropped:
+                # The data file is closed before the replace (Windows refuses
+                # to replace an open file); the sibling lock is still held, so
+                # no concurrent writer can slip between read and replace.
+                atomic_rewrite(self.path, kept)
+            return dropped

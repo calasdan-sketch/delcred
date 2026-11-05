@@ -1,0 +1,14 @@
+# Python build / runtime artefacts — never commit these
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+# local delcred state (keys, audit logs) must never be committed
+.delcred/

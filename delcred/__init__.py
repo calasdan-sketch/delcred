@@ -5,11 +5,11 @@ Five-line happy path::
     import delcred
 
     tok = delcred.delegate(
-        user="u_123", agent="billing-agent",
         scope="invoices:read", resource="https://api.acme.test/v1",
         user_token=user_jwt, agent_token=agent_jwt,
     )
-    claims = delcred.verify(tok, expected_resource="https://api.acme.test/v1")
+    claims = delcred.verify(tok, expected_resource="https://api.acme.test/v1",
+                            required_scopes="invoices:read")
 """
 
 from __future__ import annotations
@@ -34,16 +34,18 @@ from .exchange import (
 )
 from .policy import PolicyError
 from .revocation import RevocationList
-from .tokens import ExpiredToken, InvalidToken, TokenError
+from .tokens import ExpiredToken, InsufficientScope, InvalidToken, TokenError
 from .trust import TrustConfigError, add_trusted_issuer, trusted_issuers
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 __all__ = [
     "DEFAULT_TTL",
     "TOKEN_TYPE_BROKER_KEY",
     "TOKEN_TYPE_JWT",
+    "AuditLog",
     "ExchangeError",
     "ExpiredToken",
+    "InsufficientScope",
     "InvalidToken",
     "PolicyError",
     "TokenError",
@@ -53,6 +55,7 @@ __all__ = [
     "delegate",
     "delegate_api_key",
     "init",
+    "jwks",
     "revoke_agent",
     "revoke_token",
     "revoke_user",
@@ -90,7 +93,14 @@ def delegate(
     ttl: int = DEFAULT_TTL,
     base: Path | None = None,
 ) -> str:
-    """Mint a delegation JWT via RFC 8693 exchange. Returns the token."""
+    """Mint a delegation JWT via RFC 8693 exchange. Returns the token.
+
+    ``user`` / ``agent`` are optional assertions: when given, they must match
+    the identities inside ``user_token`` / ``agent_token`` or the call fails
+    before anything is minted (catches wiring mistakes such as swapped
+    tokens). The identities themselves always come from the verified tokens.
+    """
+    _assert_identities(user, agent, user_token, agent_token)
     result = _exchange(
         subject_token=user_token,
         actor_token=agent_token,
@@ -103,8 +113,28 @@ def delegate(
     return result.credential
 
 
+def _assert_identities(
+    user: str | None, agent: str | None, user_token: str, agent_token: str
+) -> None:
+    if user is None and agent is None:
+        return
+    for want, tok, role in ((user, user_token, "user"), (agent, agent_token, "agent")):
+        if want is None:
+            continue
+        try:
+            got = tokens.decode_unverified(tok).get("sub")
+        except TokenError as e:
+            raise ExchangeError(f"{role} token rejected: {e}") from e
+        if got != want:
+            raise ExchangeError(
+                f"{role}={want!r} does not match the {role} token (sub={got!r})"
+            )
+
+
 def delegate_api_key(
     *,
+    user: str | None = None,
+    agent: str | None = None,
     scope: str,
     resource: str,
     user_token: str,
@@ -113,6 +143,7 @@ def delegate_api_key(
     base: Path | None = None,
 ) -> str:
     """Mint an opaque ephemeral API key (``dk_…``) backed by a delegation."""
+    _assert_identities(user, agent, user_token, agent_token)
     result = _exchange(
         subject_token=user_token,
         actor_token=agent_token,
@@ -129,21 +160,48 @@ def verify(
     token: str,
     *,
     expected_resource: str,
+    required_scopes: str | list[str] | None = None,
     base: Path | None = None,
 ) -> dict[str, Any]:
-    """Verify a delegation JWT (signature → expiry → revocation → audience).
+    """Verify a delegation JWT (signature → expiry → audience → scope → revocation).
 
     ``expected_resource`` is required — audience pinning is the
-    confused-deputy defense and must not be skippable.
+    confused-deputy defense and must not be skippable. ``required_scopes``
+    enforces least privilege per operation (raises ``InsufficientScope``).
     """
-    return _verify(token, expected_resource=expected_resource, base=base)
+    return _verify(
+        token,
+        expected_resource=expected_resource,
+        required_scopes=required_scopes,
+        base=base,
+    )
 
 
-def verify_broker_key(key: str, base: Path | None = None) -> dict[str, Any]:
-    """Redeem an opaque broker key → capability record (burns single-use keys)."""
+def verify_broker_key(
+    key: str,
+    base: Path | None = None,
+    *,
+    expected_resource: str | None = None,
+    required_scopes: str | list[str] | None = None,
+) -> dict[str, Any]:
+    """Redeem an opaque broker key → capability record (burns single-use keys).
+
+    Pass ``expected_resource`` so a key minted for one API cannot be
+    redeemed by another (strongly recommended; optional for 0.2 compat).
+    """
     from ._common import home as _home
 
-    return Broker(base or _home()).redeem(key)
+    return Broker(base or _home()).redeem(
+        key, expected_resource=expected_resource, required_scopes=required_scopes
+    )
+
+
+def jwks(base: Path | None = None) -> dict[str, Any]:
+    """Public JWK Set for the issuer key — lets any resource server verify
+    delegation tokens with a stock JWT library (no delcred install needed)."""
+    from ._common import home as _home
+
+    return keys.jwks(base or _home())
 
 
 def revoke_token(jti: str, reason: str = "", base: Path | None = None) -> None:

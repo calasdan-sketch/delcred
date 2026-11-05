@@ -68,6 +68,40 @@ def load_public(base: Path | None = None) -> Ed25519PublicKey:
     return serialization.load_pem_public_key(pub_path.read_bytes())
 
 
+def _b64url(raw: bytes) -> str:
+    import base64
+
+    return base64.urlsafe_b64encode(raw).decode().rstrip("=")
+
+
+def key_id(pub: Ed25519PublicKey) -> str:
+    """RFC 7638 JWK thumbprint (SHA-256, base64url) — stable ``kid``."""
+    import hashlib
+    import json
+
+    x = _b64url(pub.public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw))
+    canon = json.dumps({"crv": "Ed25519", "kty": "OKP", "x": x}, separators=(",", ":"))
+    return _b64url(hashlib.sha256(canon.encode()).digest())
+
+
+def public_jwk(pub: Ed25519PublicKey) -> dict[str, str]:
+    """RFC 8037 OKP JWK for the issuer key (public half only)."""
+    x = _b64url(pub.public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw))
+    return {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": x,
+        "kid": key_id(pub),
+        "alg": "EdDSA",
+        "use": "sig",
+    }
+
+
+def jwks(base: Path | None = None) -> dict[str, list[dict[str, str]]]:
+    """JWK Set publishing the issuer's verification key (RFC 7517)."""
+    return {"keys": [public_jwk(load_public(base))]}
+
+
 def public_key_pem_b64url(pub: Ed25519PublicKey) -> str:
     """Raw 32-byte public key, base64url — for embedding in agent identity records."""
     import base64

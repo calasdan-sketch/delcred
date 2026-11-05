@@ -173,13 +173,19 @@ def verify(
     token: str,
     *,
     expected_resource: str,
+    required_scopes: str | list[str] | set[str] | None = None,
     base: Path | None = None,
 ) -> dict[str, Any]:
-    """Full verification: signature → expiry → revocation → audience.
+    """Full verification: signature → expiry → audience → scope → revocation.
 
     ``expected_resource`` is REQUIRED (finding #2): verifying without an
     audience is a confused-deputy hole. Use ``tokens.decode_unverified``
     (or the ``inspect`` CLI command) for debug-only peeks.
+
+    ``required_scopes`` (recommended): scopes this operation needs; a token
+    lacking any of them raises :class:`delcred.InsufficientScope` (→ HTTP
+    403 ``insufficient_scope``). Checked *before* the single-use burn, so a
+    token presented for the wrong operation is not destroyed.
 
     Single-use tokens are burned atomically on first successful verify.
     Raises tokens.TokenError or ExchangeError.
@@ -188,9 +194,22 @@ def verify(
     audit = AuditLog(home_)
     revocations = RevocationList(home_)
 
-    claims = tokens.verify_delegation_token(
-        token, expected_resource=expected_resource, base=home_
-    )
+    if not isinstance(expected_resource, str) or not expected_resource:
+        raise ExchangeError("expected_resource is required (audience pinning)")
+    try:
+        claims = tokens.verify_delegation_token(
+            token,
+            expected_resource=expected_resource,
+            required_scopes=required_scopes,
+            base=home_,
+        )
+    except tokens.InsufficientScope as e:
+        audit.record(
+            "verify_insufficient_scope",
+            resource=expected_resource,
+            missing=e.missing,
+        )
+        raise
     revoked, why = revocations.is_revoked(claims)
     if revoked:
         audit.record(
@@ -199,7 +218,7 @@ def verify(
             user=claims.get("sub"),
             agent=(claims.get("act") or {}).get("sub"),
         )
-        raise ExchangeError(f"token revoked: {why}")
+        raise ExchangeError(why)
     if claims.get("single_use"):
         # Burn atomically: exactly one concurrent verify wins; the losers are
         # rejected. +300s grace so the burn outlives the token's exp +

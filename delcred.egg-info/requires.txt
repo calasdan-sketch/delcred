@@ -1,6 +1,0 @@
-PyJWT>=2.8
-cryptography>=41
-PyYAML>=6
-
-[dev]
-pytest>=8
