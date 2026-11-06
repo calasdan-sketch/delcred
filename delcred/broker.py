@@ -53,6 +53,21 @@ class BrokerError(Exception):
     pass
 
 
+class BrokerScopeError(BrokerError):
+    """The key is valid for this resource but lacks required scopes.
+
+    Distinct from the uniform "invalid API key" so resource servers can
+    answer 403 ``insufficient_scope`` (step up) instead of 401 — exactly as
+    for JWTs. It is raised only after the key, expiry, revocation and
+    resource checks all pass, so it reveals nothing to a key-guesser.
+    """
+
+    def __init__(self, required: list[str], missing: list[str]):
+        self.required = required
+        self.missing = missing
+        super().__init__(f"insufficient scope: missing {missing}")
+
+
 class Broker:
     """Issues and redeems opaque ephemeral keys backed by delegation records."""
 
@@ -96,6 +111,7 @@ class Broker:
         delegation_jwt: str,
         single_use: bool = False,
         label: str = "",
+        user_iss: str | None = None,
     ) -> str:
         """Create an opaque key bound to an already-minted delegation JWT."""
         raw = KEY_PREFIX + secrets.token_urlsafe(32)
@@ -112,6 +128,7 @@ class Broker:
                 # the JWT's jti also kills this key.
                 "delegation_jti": delegation_jti,
                 "user": user,
+                "user_iss": user_iss,
                 "agent": agent,
                 "scope": scope,
                 "resource": resource,
@@ -142,6 +159,18 @@ class Broker:
                 match = rec
         return match
 
+    @staticmethod
+    def _claims(rec: dict[str, Any]) -> dict[str, Any]:
+        claims = {
+            "jti": rec["jti"],
+            "kind": "delegation",
+            "sub": rec["user"],
+            "act": {"sub": rec["agent"]},
+        }
+        if rec.get("user_iss"):
+            claims["user_iss"] = rec["user_iss"]
+        return claims
+
     def check(self, key: str) -> bool:
         """Non-consuming validity check (no single-use burn).
 
@@ -151,11 +180,7 @@ class Broker:
         match = self._find(key)
         if match is None or match["expires_at"] < _now():
             return False
-        claims = {
-            "jti": match["jti"],
-            "sub": match["user"],
-            "act": {"sub": match["agent"]},
-        }
+        claims = self._claims(match)
         revoked, _ = self.revocations.is_revoked(claims)
         if not revoked and match.get("delegation_jti"):
             revoked, _ = self.revocations.is_revoked(
@@ -190,11 +215,7 @@ class Broker:
         now = _now()
         if match["expires_at"] < now:
             raise self._reject("expired", jti=match["jti"])
-        claims = {
-            "jti": match["jti"],
-            "sub": match["user"],
-            "act": {"sub": match["agent"]},
-        }
+        claims = self._claims(match)
         revoked, why = self.revocations.is_revoked(claims)
         # Finding #1: also honor revocation of the bound delegation JWT.
         if not revoked and match.get("delegation_jti"):
@@ -212,8 +233,14 @@ class Broker:
                 str(match.get("scope", "")).split()
             )
             if missing:
-                raise self._reject(
-                    "insufficient_scope", jti=match["jti"], missing=sorted(missing)
+                self.audit.record(
+                    "broker_redeem_failed",
+                    reason="insufficient_scope",
+                    jti=match["jti"],
+                    missing=sorted(missing),
+                )
+                raise BrokerScopeError(
+                    sorted(normalize_scopes(required_scopes)), sorted(missing)
                 )
         if match.get("single_use"):
             # Atomic burn: exactly one concurrent redeem wins; the losers get

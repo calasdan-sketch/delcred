@@ -77,8 +77,11 @@ def test_broker_resource_pinning_and_scope(home, bob_subject, actor):
     )
     with pytest.raises(BrokerError, match="invalid API key"):
         delcred.verify_broker_key(key, base=home, expected_resource="https://evil.test")
-    with pytest.raises(BrokerError, match="invalid API key"):
+    from delcred.broker import BrokerScopeError
+
+    with pytest.raises(BrokerScopeError) as se:
         delcred.verify_broker_key(key, base=home, expected_resource=RES, required_scopes="x:y")
+    assert se.value.missing == ["x:y"]
     # Single-use key was not burned by the failed attempts.
     cap = delcred.verify_broker_key(key, base=home, expected_resource=RES)
     assert cap["scope"] == "invoices:read"

@@ -18,24 +18,35 @@ Endpoints (JSON request/response):
                           | 403 {"error"[,"missing"]}
     POST /broker/redeem   {"key","resource"?,"scope"?} → {"valid":true,"capability"} | 403
     GET  /.well-known/jwks.json  → issuer public key (RFC 7517 JWK Set)
-    POST /revoke          {"jti"?,"agent"?,"user"?,"reason"?} → {"revoked":true}
+    POST /revoke          {"jti"?,"agent"?,"user"?,"issuer"?,"reason"?} → {"revoked":true}
+                          requires ``Authorization: Bearer <admin token>`` when an
+                          admin token is configured, else loopback clients only
+    GET  /.well-known/oauth-authorization-server  → RFC 8414 metadata
     GET  /health          → {"status":"ok"}
 
 Security notes: bind to localhost by default; put TLS + auth in front for
-anything beyond a dev box. The API never returns secrets except the freshly
+anything beyond a dev box. Requests are served on threads with a 10 s socket
+timeout (one slow client cannot freeze the server), and ``/token``,
+``/exchange`` and ``/revoke`` are rate-limited per client IP (HTTP 429). The API never returns secrets except the freshly
 minted credential in /exchange (unavoidable — that IS the product).
 """
 
 from __future__ import annotations
 
+import hmac
+import ipaddress
 import json
-from http.server import BaseHTTPRequestHandler, HTTPServer
+import os
+import threading
+import time
+from collections import OrderedDict
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from . import _common as _c
 from .audit import AuditLog
-from .broker import Broker, BrokerError
+from .broker import Broker, BrokerError, BrokerScopeError
 from .exchange import (
     TOKEN_TYPE_ACCESS,
     TOKEN_TYPE_BROKER_KEY,
@@ -60,8 +71,60 @@ _POLICY_TO_OAUTH = {
 }
 
 
+# Revocation fields are identifiers, not documents: cap them so /revoke
+# cannot be used to grow the revocation file with huge rows.
+MAX_ID_LEN = 256
+MAX_REASON_LEN = 512
+RATE_LIMITED_PATHS = frozenset({"/token", "/exchange", "/revoke"})
+
+
+class RateLimiter:
+    """Per-key token bucket (thread-safe, bounded memory).
+
+    ``rate`` requests per ``per`` seconds, with bursts up to ``rate``.
+    At most ``max_keys`` clients are tracked (least recently seen evicted).
+    """
+
+    def __init__(self, rate: int = 60, per: float = 60.0, max_keys: int = 10_000):
+        if rate <= 0 or per <= 0:
+            raise ValueError("rate and per must be positive")
+        self.rate = float(rate)
+        self.per = float(per)
+        self.max_keys = max_keys
+        self._buckets: OrderedDict[str, tuple[float, float]] = OrderedDict()
+        self._lock = threading.Lock()
+
+    def allow(self, key: str) -> tuple[bool, int]:
+        """Returns (allowed, retry_after_seconds)."""
+        now = time.monotonic()
+        with self._lock:
+            tokens, last = self._buckets.pop(key, (self.rate, now))
+            tokens = min(self.rate, tokens + (now - last) * self.rate / self.per)
+            ok = tokens >= 1.0
+            if ok:
+                tokens -= 1.0
+            self._buckets[key] = (tokens, now)
+            while len(self._buckets) > self.max_keys:
+                self._buckets.popitem(last=False)
+            retry = 0 if ok else max(1, int((1.0 - tokens) * self.per / self.rate + 0.999))
+            return ok, retry
+
+
+def _is_loopback(addr: str) -> bool:
+    try:
+        return ipaddress.ip_address(addr.split("%")[0]).is_loopback
+    except ValueError:
+        return False
+
+
 class _Handler(BaseHTTPRequestHandler):
     base: Path  # set by serve()
+    # Socket timeout for every read/write: a client that sends headers and
+    # then stalls is dropped after this many seconds.
+    timeout = 10
+    rate_limiter: RateLimiter | None = None  # set by serve()
+    admin_token: str | None = None  # set by serve(); guards /revoke
+    public_url: str | None = None  # issuer URL for RFC 8414 metadata
 
     # Exchange payloads are small JWTs; cap the body so a malicious client
     # cannot make the (localhost) server buffer gigabytes.
@@ -125,8 +188,63 @@ class _Handler(BaseHTTPRequestHandler):
             self._send(200, {"status": "ok"})
         elif path == "/.well-known/jwks.json":
             self._send(200, _jwks(self.base))
+        elif path == "/.well-known/oauth-authorization-server":
+            self._send(200, self._as_metadata())
         else:
             self._send(404, {"error": "not found"})
+
+    def _base_url(self) -> str:
+        if self.public_url:
+            return self.public_url.rstrip("/")
+        host, port = self.server.server_address[:2]
+        if ":" in str(host):
+            host = f"[{host}]"
+        return f"http://{host}:{port}"
+
+    def _as_metadata(self) -> dict:
+        """RFC 8414 authorization-server metadata so OAuth/MCP clients can
+        discover ``/token``. Note: the ``iss`` claim inside delcred tokens is
+        ``"delcred"``, not this URL (see README Limitations)."""
+        u = self._base_url()
+        return {
+            "issuer": u,
+            "token_endpoint": u + "/token",
+            "jwks_uri": u + "/.well-known/jwks.json",
+            "grant_types_supported": [GRANT_TOKEN_EXCHANGE],
+            "token_endpoint_auth_methods_supported": ["none"],
+            "response_types_supported": [],
+            "delcred_token_issuer": _c.ISSUER_ID,
+        }
+
+    def _rate_limited(self, path: str) -> bool:
+        if self.rate_limiter is None or path not in RATE_LIMITED_PATHS:
+            return False
+        ok, retry = self.rate_limiter.allow(self.client_address[0])
+        if ok:
+            return False
+        self._send(
+            429,
+            {"error": "slow_down", "error_description": "rate limit exceeded"},
+            headers={"Retry-After": str(retry)},
+        )
+        return True
+
+    def _revoke_authorized(self) -> bool:
+        if self.admin_token:
+            from .mcp import bearer_token
+
+            got = bearer_token(self.headers.get("Authorization")) or ""
+            if hmac.compare_digest(got.encode(), self.admin_token.encode()):
+                return True
+            self._send(
+                401, {"error": "admin token required"},
+                headers={"WWW-Authenticate": 'Bearer realm="delcred-admin"'},
+            )
+            return False
+        if _is_loopback(self.client_address[0]):
+            return True
+        self._send(403, {"error": "/revoke is loopback-only without an admin token"})
+        return False
 
     def _token_endpoint(self, body: dict) -> None:
         """RFC 8693 §2.1/2.2 — standard request and response shapes."""
@@ -180,6 +298,10 @@ class _Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = urlparse(self.path).path
+        if self._rate_limited(path):
+            return
+        if path == "/revoke" and not self._revoke_authorized():
+            return
         body = self._read_json()
         if body is None:
             return  # error already sent
@@ -242,27 +364,47 @@ class _Handler(BaseHTTPRequestHandler):
                     return
                 self._send(200, {"valid": True, "claims": claims})
             elif path == "/broker/redeem":
-                rec = Broker(self.base).redeem(
-                    body["key"],
-                    expected_resource=body.get("resource") or None,
-                    required_scopes=body.get("scope") or None,
-                )
+                try:
+                    rec = Broker(self.base).redeem(
+                        body["key"],
+                        expected_resource=body.get("resource") or None,
+                        required_scopes=body.get("scope") or None,
+                    )
+                except BrokerScopeError as e:
+                    self._send(
+                        403,
+                        {"error": "insufficient_scope", "missing": e.missing},
+                        headers={
+                            "WWW-Authenticate": www_authenticate(
+                                error="insufficient_scope", scope=e.required
+                            )
+                        },
+                    )
+                    return
                 self._send(200, {"valid": True, "capability": rec})
             elif path == "/revoke":
                 rl = RevocationList(self.base)
-                reason = body.get("reason", "")
+                reason = body.get("reason", "") or ""
+                fields = {k: body.get(k) for k in ("jti", "agent", "user", "issuer")}
+                for k, v in fields.items():
+                    if v is not None and (not isinstance(v, str) or len(v) > MAX_ID_LEN):
+                        self._send(400, {"error": f"{k} must be a string of at most {MAX_ID_LEN} chars"})
+                        return
+                if not isinstance(reason, str) or len(reason) > MAX_REASON_LEN:
+                    self._send(400, {"error": f"reason must be a string of at most {MAX_REASON_LEN} chars"})
+                    return
                 if body.get("jti"):
                     rl.revoke_jti(body["jti"], reason=reason)
                 elif body.get("agent"):
                     rl.revoke_agent(body["agent"], reason=reason)
                 elif body.get("user"):
-                    rl.revoke_user(body["user"], reason=reason)
+                    rl.revoke_user(body["user"], reason=reason, issuer=body.get("issuer") or None)
                 else:
                     self._send(400, {"error": "need jti, agent, or user"})
                     return
                 AuditLog(self.base).record(
                     "api_revoke",
-                    **{k: body[k] for k in ("jti", "agent", "user") if body.get(k)},
+                    **{k: body[k] for k in ("jti", "agent", "user", "issuer") if body.get(k)},
                 )
                 self._send(200, {"revoked": True})
             else:
@@ -275,10 +417,44 @@ class _Handler(BaseHTTPRequestHandler):
             self._send(400, {"error": f"bad request: {type(e).__name__}"})
 
 
-def serve(port: int = 8400, host: str = "127.0.0.1", base: Path | None = None) -> None:
+def make_server(
+    port: int = 8400,
+    host: str = "127.0.0.1",
+    base: Path | None = None,
+    *,
+    rate: int = 60,
+    admin_token: str | None = None,
+    public_url: str | None = None,
+) -> ThreadingHTTPServer:
+    """Build (but do not start) the threaded exchange server."""
     base = base or _c.home()
-    _Handler.base = base
-    httpd = HTTPServer((host, port), _Handler)
+    handler = type(
+        "_BoundHandler",
+        (_Handler,),
+        {
+            "base": base,
+            "rate_limiter": RateLimiter(rate=rate) if rate > 0 else None,
+            "admin_token": admin_token or os.environ.get("DELCRED_ADMIN_TOKEN") or None,
+            "public_url": public_url,
+        },
+    )
+    httpd = ThreadingHTTPServer((host, port), handler)
+    httpd.daemon_threads = True
+    return httpd
+
+
+def serve(
+    port: int = 8400,
+    host: str = "127.0.0.1",
+    base: Path | None = None,
+    *,
+    rate: int = 60,
+    admin_token: str | None = None,
+    public_url: str | None = None,
+) -> None:
+    httpd = make_server(
+        port, host, base, rate=rate, admin_token=admin_token, public_url=public_url
+    )
     print(
         f"delcred serve on http://{host}:{port} (localhost only — "
         f"put TLS+auth in front for shared networks)"

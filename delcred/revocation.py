@@ -71,11 +71,17 @@ class RevocationList:
             {"type": "agent", "agent": agent, "revoked_at": _now(), "reason": reason}
         )
 
-    def revoke_user(self, user: str, reason: str = "") -> None:
-        """Kill switch: invalidate every token delegated by this user."""
-        self._append(
-            {"type": "user", "user": user, "revoked_at": _now(), "reason": reason}
-        )
+    def revoke_user(self, user: str, reason: str = "", issuer: str | None = None) -> None:
+        """Kill switch: invalidate every token delegated by this user.
+
+        Users are ``(issuer, user)`` pairs. With ``issuer=None`` the switch
+        covers the id under *every* issuer (fail-closed); pass an issuer to
+        revoke only that IdP's user.
+        """
+        entry = {"type": "user", "user": user, "revoked_at": _now(), "reason": reason}
+        if issuer:
+            entry["iss"] = issuer
+        self._append(entry)
 
     def burn_once(
         self, jti: str, reason: str = "", expires_at: int | None = None
@@ -148,7 +154,11 @@ class RevocationList:
         agent = (claims.get("act") or {}).get("sub")
         if agent is None and claims.get("kind") == "agent":
             agent = claims.get("sub")
-        user = claims.get("sub")
+        from .tokens import user_issuer
+
+        # Agent identity tokens name an agent in ``sub``, not a user.
+        user = None if claims.get("kind") == "agent" else claims.get("sub")
+        user_iss = user_issuer(claims)
         for e in self._entries():
             exp = e.get("expires_at")
             if exp is not None and exp < now:
@@ -161,7 +171,12 @@ class RevocationList:
                     True,
                     f"agent {agent!r} revoked: {e.get('reason') or 'kill switch'}",
                 )
-            if t == "user" and user and e.get("user") == user:
+            if (
+                t == "user"
+                and user
+                and e.get("user") == user
+                and (not e.get("iss") or e.get("iss") == user_iss)
+            ):
                 return (
                     True,
                     f"user {user!r} revoked: {e.get('reason') or 'kill switch'}",

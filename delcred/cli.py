@@ -171,8 +171,9 @@ def cmd_revoke(args):
         delcred.revoke_agent(args.agent, reason=args.reason, base=h)
         print(f"revoked ALL credentials for agent {args.agent!r} (user unaffected)")
     elif args.user:
-        delcred.revoke_user(args.user, reason=args.reason, base=h)
-        print(f"revoked ALL delegations by user {args.user!r}")
+        delcred.revoke_user(args.user, reason=args.reason, base=h, issuer=args.issuer)
+        scope_ = f" from issuer {args.issuer}" if args.issuer else " (every issuer)"
+        print(f"revoked ALL delegations by user {args.user!r}{scope_}")
     else:
         print("nothing to revoke: need one of --jti, --agent, --user", file=sys.stderr)
         sys.exit(2)
@@ -215,7 +216,9 @@ def cmd_trust_add(args):
     from delcred.trust import TrustConfigError, add_trusted_issuer
 
     try:
-        dest = add_trusted_issuer(args.iss, args.key_file, base=_base(args))
+        dest = add_trusted_issuer(
+            args.iss, args.key_file, base=_base(args), audience=args.audience
+        )
     except TrustConfigError as e:
         print(f"trust-add failed: {e}", file=sys.stderr)
         sys.exit(3)
@@ -326,7 +329,16 @@ def cmd_demo(args):
 def cmd_serve(args):
     from delcred.server import serve
 
-    serve(port=args.port, base=_base(args))
+    admin = None
+    if args.admin_token_file:
+        admin = _read_file_secret(args.admin_token_file)
+    serve(
+        port=args.port,
+        base=_base(args),
+        rate=args.rate_limit,
+        admin_token=admin,
+        public_url=args.public_url,
+    )
 
 
 def cmd_sidecar(args):
@@ -441,6 +453,9 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--jti")
     s.add_argument("--agent")
     s.add_argument("--user")
+    s.add_argument(
+        "--issuer", help="with --user: only that IdP's user (default: the id under every issuer)"
+    )
     s.add_argument("--reason", default="")
     s.set_defaults(func=cmd_revoke)
 
@@ -501,6 +516,18 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser("serve", help="run the HTTP exchange API")
     s.add_argument("--port", type=int, default=8400)
+    s.add_argument(
+        "--rate-limit", type=int, default=60,
+        help="max /token, /exchange, /revoke requests per minute per client IP (0 = off)",
+    )
+    s.add_argument(
+        "--admin-token-file",
+        help="file holding the bearer token /revoke requires (or $DELCRED_ADMIN_TOKEN); "
+        "without one, /revoke accepts loopback clients only",
+    )
+    s.add_argument(
+        "--public-url", help="external base URL, used as issuer in RFC 8414 metadata"
+    )
     s.set_defaults(func=cmd_serve)
 
     s = sub.add_parser("sidecar", help="run the credential-injecting forward proxy")
@@ -534,6 +561,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--key-file",
         required=True,
         help="PEM file with the issuer's Ed25519 public key",
+    )
+    s.add_argument(
+        "--audience",
+        help="aud the IdP's subject tokens must carry (default: 'delcred')",
     )
     s.set_defaults(func=cmd_trust_add)
 

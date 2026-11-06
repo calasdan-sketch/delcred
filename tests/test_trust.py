@@ -38,7 +38,8 @@ def idp_keypair(tmp_path):
 
 def _idp_token(priv_pem, iss=IDP_ISS, sub="u_alice", **extra):
     now = int(time.time())
-    claims = {"iss": iss, "sub": sub, "iat": now, "exp": now + 300}
+    # 0.3: external subject tokens must name delcred as audience.
+    claims = {"iss": iss, "sub": sub, "aud": "delcred", "iat": now, "exp": now + 300}
     claims.update(extra)
     return jwt.encode(claims, priv_pem, algorithm="EdDSA")
 
@@ -54,7 +55,7 @@ def test_trusted_issuer_accepted(home, idp_keypair):
     priv_pem, pub_path = idp_keypair
     delcred.trust_add(IDP_ISS, str(pub_path), base=home)
     tok = _idp_token(priv_pem)
-    claims = verify_signature(tok, base=home)
+    claims = verify_signature(tok, base=home, allow_external=True)
     assert claims["iss"] == IDP_ISS
     assert claims["sub"] == "u_alice"
 
@@ -69,7 +70,7 @@ def test_trusted_issuer_wrong_key_rejected(home, idp_keypair):
         serialization.NoEncryption(),
     )
     with pytest.raises(InvalidToken):
-        verify_signature(_idp_token(other), base=home)
+        verify_signature(_idp_token(other), base=home, allow_external=True)
 
 
 def test_trusted_issuer_tampered_rejected(home, idp_keypair):
@@ -84,7 +85,9 @@ def test_trusted_issuer_tampered_rejected(home, idp_keypair):
     payload["sub"] = "u_bob"
     bad_payload = base64.urlsafe_b64encode(json.dumps(payload).encode()).rstrip(b"=").decode()
     with pytest.raises(InvalidToken):
-        verify_signature(".".join([parts[0], bad_payload, parts[2]]), base=home)
+        verify_signature(
+            ".".join([parts[0], bad_payload, parts[2]]), base=home, allow_external=True
+        )
 
 
 def test_trust_add_copies_key_and_updates_policy(home, idp_keypair):
@@ -125,6 +128,20 @@ def test_exchange_with_external_subject_token(home, actor, idp_keypair):
     priv_pem, pub_path = idp_keypair
     delcred.trust_add(IDP_ISS, str(pub_path), base=home)
     ext_subject = _idp_token(priv_pem)  # no delcred "kind" — a real IdP token
+    # 0.3: users are (issuer, sub) — an IdP user needs a grant naming its issuer.
+    import yaml
+
+    pol = yaml.safe_load((home / "policy.yaml").read_text())
+    pol["grants"].append(
+        {
+            "user": "u_alice",
+            "issuer": IDP_ISS,
+            "agent": "billing-agent",
+            "scopes": ["invoices:read"],
+            "resources": ["https://api.acme.test/v1"],
+        }
+    )
+    (home / "policy.yaml").write_text(yaml.safe_dump(pol))
     result = exchange(
         subject_token=ext_subject,
         actor_token=actor,
@@ -134,6 +151,7 @@ def test_exchange_with_external_subject_token(home, actor, idp_keypair):
     )
     assert result.claims["sub"] == "u_alice"
     assert result.claims["act"] == {"sub": "billing-agent"}
+    assert result.claims["user_iss"] == IDP_ISS
 
 
 def test_external_token_with_agent_kind_still_rejected(home, actor, idp_keypair):
@@ -156,7 +174,7 @@ def test_malformed_trusted_issuers_config_rejected(home, idp_keypair):
     priv_pem, _ = idp_keypair
     # well-formed token, unknown issuer → config load blows up first
     with pytest.raises(InvalidToken, match="trusted_issuers"):
-        verify_signature(_idp_token(priv_pem), base=home)
+        verify_signature(_idp_token(priv_pem), base=home, allow_external=True)
 
 
 def test_trust_add_slug_collision_keeps_both_keys(home, idp_keypair, tmp_path):

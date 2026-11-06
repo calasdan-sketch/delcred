@@ -219,13 +219,19 @@ def revoke_agent(agent: str, reason: str = "", base: Path | None = None) -> None
     AuditLog(h).record("agent_revoked", agent=agent, reason=reason)
 
 
-def revoke_user(user: str, reason: str = "", base: Path | None = None) -> None:
-    """Kill switch: invalidate every delegation made by this user."""
+def revoke_user(
+    user: str, reason: str = "", base: Path | None = None, issuer: str | None = None
+) -> None:
+    """Kill switch: invalidate every delegation made by this user.
+
+    ``issuer=None`` revokes the id under every issuer (fail-closed); pass an
+    IdP issuer URL to revoke only that IdP's user.
+    """
     from ._common import home as _home
 
     h = base or _home()
-    RevocationList(h).revoke_user(user, reason=reason)
-    AuditLog(h).record("user_revoked", user=user, reason=reason)
+    RevocationList(h).revoke_user(user, reason=reason, issuer=issuer)
+    AuditLog(h).record("user_revoked", user=user, issuer=issuer, reason=reason)
 
 
 def agent_token(agent_id: str, ttl: int = 86400, base: Path | None = None) -> str:
@@ -234,11 +240,16 @@ def agent_token(agent_id: str, ttl: int = 86400, base: Path | None = None) -> st
     return tokens.mint_agent_token(agent_id, ttl=ttl, base=base or _home())
 
 
-def trust_add(iss: str, key_file: str, base: Path | None = None) -> Path:
-    """Trust an external IdP's subject tokens: register its Ed25519 public key."""
+def trust_add(
+    iss: str, key_file: str, base: Path | None = None, audience: str | None = None
+) -> Path:
+    """Trust an external IdP's subject tokens: register its Ed25519 public key.
+
+    Its tokens must carry ``aud`` = ``audience`` (default ``"delcred"``).
+    """
     from ._common import home as _home
 
-    return add_trusted_issuer(iss, key_file, base=base or _home())
+    return add_trusted_issuer(iss, key_file, base=base or _home(), audience=audience)
 
 
 def user_token(user_id: str, ttl: int = 3600, base: Path | None = None) -> str:

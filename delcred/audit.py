@@ -14,7 +14,9 @@ access. Anchor the head hash somewhere the host cannot rewrite (a ticket, a
 SIEM, a commit) — ``delcred audit head`` prints it — and compare later.
 
 Entries written by delcred < 0.3 have no ``hash``; they are reported as
-legacy and the chain starts at the first hashed entry.
+legacy. The first hashed entry is anchored: it must chain onto ``GENESIS``
+(fresh log) or onto the SHA-256 of the raw last legacy line, so deleting the
+oldest hashed entries is detected even if fake legacy lines are added.
 """
 
 from __future__ import annotations
@@ -186,6 +188,12 @@ class AuditLog:
         """Recompute the hash chain. ``ok`` is False on any break."""
         res = AuditVerifyResult(ok=True)
         prev: str | None = None  # None until the first hashed entry
+        # Genesis anchor: the first hashed entry must chain onto GENESIS (new
+        # log) or onto the SHA-256 of the raw last legacy line (0.2 log being
+        # upgraded) — exactly what record() wrote. Deleting the oldest hashed
+        # entries and padding with fake "legacy" lines therefore breaks the
+        # chain unless the attacker finds a SHA-256 preimage.
+        legacy_digest = GENESIS
         for lineno, line in self._iter_lines():
             res.entries += 1
             try:
@@ -198,18 +206,14 @@ class AuditLog:
             if not isinstance(e, dict) or "hash" not in e:
                 if prev is None:
                     res.legacy += 1
+                    legacy_digest = hashlib.sha256(line.encode()).hexdigest()
                     continue
                 res.ok = False
                 res.problems.append(f"line {lineno}: unhashed entry inside the chain")
                 prev = hashlib.sha256(line.encode()).hexdigest()
                 continue
             res.chained += 1
-            expected_prev = GENESIS if prev is None and res.legacy == 0 else prev
-            if prev is None and res.legacy:
-                # First hashed entry after legacy lines chains onto the raw
-                # digest of the last legacy line; accept whatever it claims
-                # (legacy lines are unauthenticated anyway) but report it.
-                expected_prev = e.get("prev")
+            expected_prev = legacy_digest if prev is None else prev
             if e.get("prev") != expected_prev:
                 res.ok = False
                 res.problems.append(

@@ -69,7 +69,10 @@ def exchange(
 
     # 1. Validate both input tokens (signature → issuer → expiry).
     try:
-        sub_claims = tokens.verify_signature(subject_token, base=home_)
+        # Only the subject may come from a trusted external IdP.
+        sub_claims = tokens.verify_signature(
+            subject_token, base=home_, allow_external=True
+        )
     except (InvalidToken, ExpiredToken) as e:
         audit.record("exchange_failed", reason="bad_subject_token", detail=str(e))
         raise ExchangeError(f"subject_token rejected: {e}") from e
@@ -89,6 +92,7 @@ def exchange(
         raise ExchangeError("subject_token must identify a user, not an agent")
     _require_kind(act_claims, "agent", "actor")
     user = sub_claims["sub"]
+    user_iss = tokens.user_issuer(sub_claims)
     agent = act_claims["sub"]
 
     # 3. Neither party may be revoked.
@@ -103,7 +107,7 @@ def exchange(
     # 4. Policy check: deny by default, scope ⊆ grant, exact resource match.
     policy = load_policy(home_)
     try:
-        grant = policy.check(user, agent, scope, resource, ttl)
+        grant = policy.check(user, agent, scope, resource, ttl, issuer=user_iss)
     except PolicyError as e:
         audit.record(
             "exchange_denied",
@@ -125,6 +129,7 @@ def exchange(
         resource=resource,
         ttl=effective_ttl,
         single_use=single_use,
+        user_iss=user_iss,
         base=home_,
     )
     claims = tokens.decode_unverified(delegation_jwt)
@@ -139,6 +144,7 @@ def exchange(
             ttl=effective_ttl,
             delegation_jwt=delegation_jwt,
             single_use=single_use,
+            user_iss=user_iss,
         )
         audit.record(
             "broker_issued",

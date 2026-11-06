@@ -29,7 +29,7 @@ from pathlib import Path
 
 import yaml
 
-from ._common import MAX_TTL, home
+from ._common import ISSUER_ID, MAX_TTL, home
 
 
 @dataclass
@@ -40,6 +40,10 @@ class Grant:
     resources: list[str] = field(default_factory=list)
     max_ttl: int = MAX_TTL
     single_use: bool = False
+    # Which issuer vouches for ``user``. Users are identified by
+    # (issuer, user): a grant without ``issuer`` covers only local users,
+    # never an IdP user who happens to share the id.
+    issuer: str = ISSUER_ID
 
 
 @dataclass
@@ -48,23 +52,30 @@ class Policy:
     users: dict = field(default_factory=dict)
     grants: list[Grant] = field(default_factory=list)
 
-    def grant_for(self, user: str, agent: str) -> Grant | None:
+    def grant_for(self, user: str, agent: str, issuer: str = ISSUER_ID) -> Grant | None:
         for g in self.grants:
-            if g.user == user and g.agent == agent:
+            if g.user == user and g.agent == agent and g.issuer == issuer:
                 return g
         return None
 
     def check(
-        self, user: str, agent: str, scope: str, resource: str, ttl: int
+        self,
+        user: str,
+        agent: str,
+        scope: str,
+        resource: str,
+        ttl: int,
+        issuer: str = ISSUER_ID,
     ) -> Grant:
         """Validate a request against policy. Returns the grant (TTL clamped).
 
         Raises PolicyError if anything is not permitted.
         """
-        grant = self.grant_for(user, agent)
+        grant = self.grant_for(user, agent, issuer)
         if grant is None:
+            who = user if issuer == ISSUER_ID else f"{user!r}@{issuer}"
             raise PolicyError(
-                f"no delegation grant for user={user!r} agent={agent!r} "
+                f"no delegation grant for user={who!r} agent={agent!r} "
                 "(deny by default)",
                 code="no_grant",
             )
@@ -147,6 +158,7 @@ def load(base: Path | None = None) -> Policy:
                 resources=list(g.get("resources", []) or []),
                 max_ttl=int(g.get("max_ttl", MAX_TTL)),
                 single_use=bool(g.get("single_use", False)),
+                issuer=str(g.get("issuer") or ISSUER_ID),
             )
         )
     return Policy(

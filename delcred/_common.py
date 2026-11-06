@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import secrets
 import stat
 from pathlib import Path
 
@@ -44,13 +45,31 @@ def assert_private(path: Path) -> None:
 
 
 def write_private(path: Path, data: bytes) -> None:
-    """Write a secret file with 0600 permissions (no races via O_CREAT|O_EXCL)."""
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    """Write a secret file that is never readable by group/other, even briefly.
+
+    The bytes go to a fresh temp file created with ``O_CREAT | O_EXCL`` and
+    mode 0600 (so a pre-existing or planted file is never reused), are
+    fsynced, then atomically renamed over ``path``. A pre-existing
+    world-readable ``path`` is replaced, not written into.
+    """
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.{secrets.token_hex(4)}.tmp")
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(tmp, flags, 0o600)
     try:
-        os.write(fd, data)
-    finally:
+        try:
+            os.fchmod(fd, 0o600)  # umask can only remove bits; be explicit
+        except (AttributeError, OSError):  # pragma: no cover - Windows
+            pass
+        view = memoryview(data)
+        while view:
+            view = view[os.write(fd, view):]
+        os.fsync(fd)
+    except BaseException:
         os.close(fd)
-    os.chmod(path, 0o600)
+        tmp.unlink(missing_ok=True)
+        raise
+    os.close(fd)
+    os.replace(tmp, path)
 
 
 def load_json(path: Path, default):

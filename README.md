@@ -125,7 +125,9 @@ upstream API your server calls.
 
 Resource servers that don't run delcred can verify tokens with any JWT
 library using the issuer's public key: `delcred jwks` (or
-`GET /.well-known/jwks.json` on `delcred serve`). Every token carries a
+`GET /.well-known/jwks.json` on `delcred serve`, also advertised as
+`jwks_uri` in its RFC 8414 metadata — not in the RFC 9728 resource document,
+whose `jwks_uri` is reserved for the resource's own keys). Every token carries a
 `kid` (RFC 7638 thumbprint).
 
 ## Library
@@ -160,10 +162,15 @@ tokens (catches swapped tokens before anything is minted).
 | `POST /token` | **Standard RFC 8693 token exchange** (form-encoded `grant_type=urn:ietf:params:oauth:grant-type:token-exchange`, `subject_token`, `actor_token`, `*_token_type`, `scope`, `resource`). Returns `access_token`, `issued_token_type`, `token_type`, `expires_in`, `scope`; errors use RFC 6749/8693 codes (`invalid_scope`, `invalid_target`, `invalid_grant`, …). `Cache-Control: no-store`. |
 | `POST /exchange` | JSON form of the same (0.2-compatible) |
 | `POST /verify` | `{"token","resource","scope"?}` → claims, or 403 `insufficient_scope` |
-| `POST /broker/redeem` | `{"key","resource"?,"scope"?}` → capability |
-| `POST /revoke` | `{"jti"|"agent"|"user","reason"?}` |
+| `POST /broker/redeem` | `{"key","resource"?,"scope"?}` → capability, or 403 `insufficient_scope` |
+| `POST /revoke` | `{"jti"|"agent"|"user","issuer"?,"reason"?}` — needs `Authorization: Bearer <admin token>` if `--admin-token-file` / `$DELCRED_ADMIN_TOKEN` is set, otherwise loopback clients only; ids ≤ 256 chars |
+| `GET /.well-known/oauth-authorization-server` | RFC 8414 metadata (`token_endpoint`, `jwks_uri`) so OAuth/MCP clients can discover `/token`; `--public-url` sets `issuer` |
 | `GET /.well-known/jwks.json` | issuer public key |
 | `GET /health` | liveness |
+
+Requests run on threads with a 10-second socket timeout, and `/token`,
+`/exchange` and `/revoke` are limited to `--rate-limit` requests per minute
+per client IP (default 60; HTTP 429 with `Retry-After`).
 
 ## The sidecar pattern
 
@@ -184,10 +191,33 @@ delcred is **not** an IdP — it never does login or OAuth flows. It accepts
 your IdP's user JWTs as `subject_token` once the issuer is registered:
 
 ```bash
-delcred trust-add --iss https://idp.example.com --key-file ./idp-pub.pem
+delcred trust-add --iss https://idp.example.com --key-file ./idp-pub.pem \
+                  --audience delcred        # aud the IdP's tokens must carry (default)
 ```
 
-or in `policy.yaml`: `trusted_issuers: {"https://idp.example.com": "trusted_issuers/idp.pem"}`.
+Rules that keep an IdP from becoming a back door:
+
+- An external IdP is trusted **only for the subject (user) token**. Agent
+  tokens and delegation tokens must be signed by delcred's own key — an IdP
+  cannot mint itself an agent identity or a delegation.
+- The IdP token's `aud` must contain the configured audience, so a token the
+  IdP issued for some other app cannot be replayed into delcred.
+- Users are identified by **(issuer, user id)**. A grant covers local users
+  unless it names the IdP:
+
+  ```yaml
+  grants:
+    - user: u_alice
+      issuer: "https://idp.example.com"   # without this line: local users only
+      agent: billing-agent
+      scopes: ["invoices:read"]
+      resources: ["https://api.acme.test/v1"]
+  ```
+
+  Delegation tokens record it as `user_iss`. `delcred revoke --user u_alice
+  --issuer https://idp.example.com` revokes only that IdP's user; without
+  `--issuer` the id is revoked under every issuer (fail-closed).
+
 The local issuer can never be shadowed, unknown issuers are rejected, and a
 trusted token with `kind: agent` is still refused as a subject.
 
@@ -252,7 +282,8 @@ service.
 
 ## Security model
 
-- **Ed25519 only.** Strict `algorithms=["EdDSA"]`, issuer pinned, `typ: at+jwt`,
+- **Ed25519 only.** Strict `algorithms=["EdDSA"]`, issuer pinned (delegation and
+  agent tokens: local issuer only), `typ: at+jwt` required on delegation tokens,
   `kid` checked. `none`/HS256/RSA confusion rejected.
 - **Short lifetimes are the primary control:** default 15 min, hard cap 60 min,
   clamped server-side.
@@ -290,9 +321,11 @@ service.
 5. **Local user assertions are dev-only.** In production register your IdP
    with `trust-add`; only Ed25519 (EdDSA) IdP keys are supported, and keys are
    static PEM files (no JWKS fetching).
-6. **`delcred serve` has no authentication.** It binds localhost; anyone who can
-   reach it can mint within policy and call `/revoke`. Put TLS + auth in front
-   before exposing it.
+6. **`delcred serve` has no client authentication for minting.** It binds
+   localhost; anyone who can reach `/token` or `/exchange` can mint within
+   policy (rate-limited). `/revoke` is loopback-only unless you set an admin
+   token. Put TLS + auth in front before exposing it. `/token` also accepts
+   JSON bodies and requires `scope`, which is stricter than RFC 8693.
 7. **No chained delegation** (`may_act`, agent → sub-agent).
 8. **Windows** is supported by design (portable locking, no POSIX-only
    imports) but the test suite runs on Linux; on Windows the 0600 key-file
@@ -303,6 +336,12 @@ service.
    to drop expired entries. Agent/user kill switches are permanent (there is
    no un-revoke command yet).
 10. **Clock skew.** 60 s leeway is assumed.
+11. **Token `iss` is not a URL.** Tokens carry `iss: "delcred"` while the
+    RFC 8414 metadata reports the server URL as `issuer`. OAuth clients that
+    insist the access token's `iss` equals the metadata issuer will object;
+    resource servers using delcred (or `delcred_token_issuer` from the
+    metadata) are unaffected. Changing `iss` would invalidate every existing
+    token, so it is left for a deliberate major release.
 
 ## Development
 

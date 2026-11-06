@@ -8,7 +8,15 @@ configure each trusted issuer once in ``policy.yaml``::
       "https://idp.example.com": "trusted_issuers/idp.pem"
 
 The value is a PEM file holding the issuer's **Ed25519 public key**
-(relative paths resolve against the delcred home). Only ``EdDSA`` subject
+(relative paths resolve against the delcred home), or a mapping::
+
+    trusted_issuers:
+      "https://idp.example.com":
+        key: "trusted_issuers/idp.pem"
+        audience: "https://delcred.acme.internal"   # default: "delcred"
+
+Subject tokens from an external issuer MUST carry that audience in ``aud``
+— an IdP token minted for some other app cannot be replayed into delcred. Only ``EdDSA`` subject
 tokens are accepted, mirroring the local token policy — delcred never
 touches RSA/ECDSA confusion territory.
 
@@ -39,6 +47,13 @@ def _policy_path(base: Path) -> Path:
 
 def trusted_issuers(base: Path | None = None) -> dict[str, Ed25519PublicKey]:
     """Load ``{iss: Ed25519PublicKey}`` from the policy file's trusted_issuers section."""
+    return {iss: key for iss, (key, _aud) in trusted_issuer_configs(base).items()}
+
+
+def trusted_issuer_configs(
+    base: Path | None = None,
+) -> dict[str, tuple[Ed25519PublicKey, str]]:
+    """Load ``{iss: (Ed25519PublicKey, required_audience)}``."""
     home_ = base or home()
     p = _policy_path(home_)
     if not p.exists():
@@ -50,8 +65,17 @@ def trusted_issuers(base: Path | None = None) -> dict[str, Ed25519PublicKey]:
     raw = data.get("trusted_issuers") or {}
     if not isinstance(raw, dict):
         raise TrustConfigError("policy.yaml: 'trusted_issuers' must be a mapping of iss -> key file")
-    out: dict[str, Ed25519PublicKey] = {}
-    for iss, key_file in raw.items():
+    out: dict[str, tuple[Ed25519PublicKey, str]] = {}
+    for iss, entry in raw.items():
+        audience = ISSUER_ID
+        key_file = entry
+        if isinstance(entry, dict):
+            key_file = entry.get("key")
+            audience = entry.get("audience", ISSUER_ID)
+            if not isinstance(audience, str) or not audience:
+                raise TrustConfigError(
+                    f"policy.yaml: trusted_issuers[{iss!r}].audience must be a non-empty string"
+                )
         if not isinstance(iss, str) or not iss:
             raise TrustConfigError("policy.yaml: trusted_issuers keys must be non-empty issuer strings")
         if iss == ISSUER_ID:
@@ -76,11 +100,13 @@ def trusted_issuers(base: Path | None = None) -> dict[str, Ed25519PublicKey]:
                 f"policy.yaml: trusted_issuers[{iss!r}]: key in {kp} is not Ed25519 "
                 "(delcred accepts EdDSA subject tokens only)"
             )
-        out[iss] = key
+        out[iss] = (key, audience)
     return out
 
 
-def add_trusted_issuer(iss: str, key_file: str, base: Path | None = None) -> Path:
+def add_trusted_issuer(
+    iss: str, key_file: str, base: Path | None = None, audience: str | None = None
+) -> Path:
     """Copy an IdP's Ed25519 public key into the home and register it.
 
     Returns the path the key was stored at. Updates (or appends) the
@@ -100,6 +126,8 @@ def add_trusted_issuer(iss: str, key_file: str, base: Path | None = None) -> Pat
         raise TrustConfigError(f"refusing to shadow the local issuer {ISSUER_ID!r}")
     if '"' in iss or "\n" in iss or not iss.strip():
         raise TrustConfigError(f"issuer {iss!r} is not a valid issuer string")
+    if audience is not None and (not audience.strip() or '"' in audience or "\n" in audience):
+        raise TrustConfigError(f"audience {audience!r} is not valid")
 
     dest_dir = home_ / "trusted_issuers"
     dest_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -121,14 +149,23 @@ def add_trusted_issuer(iss: str, key_file: str, base: Path | None = None) -> Pat
     # Validate the resulting registry before returning (fail closed if the
     # written config does not load).
     rel = dest.relative_to(home_).as_posix()
-    _upsert_policy_mapping(home_, iss, rel)
+    _upsert_policy_mapping(home_, iss, rel, audience)
     trusted_issuers(home_)
     return dest
 
 
-def _upsert_policy_mapping(home_: Path, iss: str, rel: str) -> None:
+def _upsert_policy_mapping(home_: Path, iss: str, rel: str, audience: str | None = None) -> None:
     p = _policy_path(home_)
     text = p.read_text() if p.exists() else ""
+    if audience is not None:
+        data = yaml.safe_load(text) or {}
+        section = data.get("trusted_issuers") or {}
+        if not isinstance(section, dict):
+            raise TrustConfigError("policy.yaml: 'trusted_issuers' must be a mapping")
+        section[iss] = {"key": rel, "audience": audience}
+        data["trusted_issuers"] = section
+        p.write_text(yaml.safe_dump(data, sort_keys=False))
+        return
     if "trusted_issuers:" not in text:
         # Append a new section — leaves hand-edited content byte-identical.
         if text and not text.endswith("\n"):

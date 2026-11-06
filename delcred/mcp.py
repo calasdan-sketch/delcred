@@ -42,7 +42,7 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from ._common import KEY_PREFIX, home
-from .broker import Broker, BrokerError
+from .broker import Broker, BrokerError, BrokerScopeError
 from .exchange import ExchangeError
 from .exchange import verify as _verify
 from .tokens import InsufficientScope, TokenError, normalize_scopes
@@ -86,15 +86,29 @@ def metadata_path(resource: str) -> str:
     return "/.well-known/oauth-protected-resource" + path
 
 
+def default_metadata_url(resource: str) -> str:
+    """Absolute RFC 9728 metadata URL for ``resource`` (same origin)."""
+    parts = urlsplit(resource)
+    if not parts.scheme or not parts.netloc:
+        raise ValueError(f"resource must be an absolute URL, got {resource!r}")
+    return f"{parts.scheme}://{parts.netloc}{metadata_path(resource)}"
+
+
 def protected_resource_metadata(
     resource: str,
     authorization_servers: list[str],
     *,
     scopes_supported: list[str] | None = None,
     resource_name: str | None = None,
-    jwks_uri: str | None = None,
 ) -> dict[str, Any]:
-    """RFC 9728 Protected Resource Metadata document for an MCP server."""
+    """RFC 9728 Protected Resource Metadata document for an MCP server.
+
+    ``authorization_servers`` should list the delcred ``serve`` base URL;
+    clients find ``/token`` and the issuer JWKS through its RFC 8414
+    ``/.well-known/oauth-authorization-server`` document. (RFC 9728's
+    ``jwks_uri`` is for the *resource's own* signing keys, so delcred does
+    not put the issuer's key there.)
+    """
     if not authorization_servers:
         raise ValueError("authorization_servers must list at least one issuer URL")
     doc: dict[str, Any] = {
@@ -106,8 +120,6 @@ def protected_resource_metadata(
         doc["scopes_supported"] = sorted(normalize_scopes(scopes_supported))
     if resource_name:
         doc["resource_name"] = resource_name
-    if jwks_uri:
-        doc["jwks_uri"] = jwks_uri
     return doc
 
 
@@ -156,11 +168,17 @@ def authorize(
 ) -> AuthDecision:
     """Authorize one request. Never raises for bad credentials — returns a decision.
 
+    Every challenge carries ``resource_metadata`` (the MCP spec relies on it
+    for discovery): pass ``resource_metadata_url`` or it is derived from
+    ``resource`` as ``<origin>/.well-known/oauth-protected-resource<path>``.
+
     Error descriptions are deliberately generic (no oracle about *why* a
     token failed); the delcred audit log records the specific reason.
     """
     if not resource:
         raise ValueError("resource is required (audience pinning)")
+    if not resource_metadata_url:
+        resource_metadata_url = default_metadata_url(resource)
     need = sorted(normalize_scopes(required_scopes))
 
     def deny(status: int, error: str, desc: str, scope=None) -> AuthDecision:
@@ -195,6 +213,8 @@ def authorize(
             rec = Broker(home_).redeem(
                 token, expected_resource=resource, required_scopes=need or None
             )
+        except BrokerScopeError as e:
+            return deny(403, "insufficient_scope", "additional scope required", scope=e.required)
         except BrokerError:
             return deny(401, "invalid_token", "invalid or expired credential")
         claims = {
