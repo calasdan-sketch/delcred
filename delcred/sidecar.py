@@ -22,7 +22,7 @@ import threading
 import time
 import urllib.error
 import urllib.request
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import ClassVar
 from urllib.parse import urlparse
@@ -49,6 +49,7 @@ class _ProxyHandler(BaseHTTPRequestHandler):
     base: ClassVar[Path | None] = None
     _cache: ClassVar[dict[str, _CacheEntry]] = {}
     _lock = threading.Lock()
+    timeout = 10  # drop clients that stall mid-request
 
     def log_message(self, *a):
         pass
@@ -184,7 +185,8 @@ def run_sidecar(
     _ProxyHandler.user_token = user_token
     _ProxyHandler.agent_token = agent_token
     _ProxyHandler.base = base
-    httpd = HTTPServer((host, port), _ProxyHandler)
+    httpd = ThreadingHTTPServer((host, port), _ProxyHandler)
+    httpd.daemon_threads = True
     print(
         f"delcred sidecar on http://{host}:{port} "
         f"({len(_ProxyHandler.mapping)} upstream(s) allowlisted)"

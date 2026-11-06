@@ -29,7 +29,7 @@ from pathlib import Path
 
 import yaml
 
-from ._common import MAX_TTL, home
+from ._common import ISSUER_ID, MAX_TTL, home
 
 
 @dataclass
@@ -40,6 +40,10 @@ class Grant:
     resources: list[str] = field(default_factory=list)
     max_ttl: int = MAX_TTL
     single_use: bool = False
+    # Which issuer vouches for ``user``. Users are identified by
+    # (issuer, user): a grant without ``issuer`` covers only local users,
+    # never an IdP user who happens to share the id.
+    issuer: str = ISSUER_ID
 
 
 @dataclass
@@ -48,24 +52,32 @@ class Policy:
     users: dict = field(default_factory=dict)
     grants: list[Grant] = field(default_factory=list)
 
-    def grant_for(self, user: str, agent: str) -> Grant | None:
+    def grant_for(self, user: str, agent: str, issuer: str = ISSUER_ID) -> Grant | None:
         for g in self.grants:
-            if g.user == user and g.agent == agent:
+            if g.user == user and g.agent == agent and g.issuer == issuer:
                 return g
         return None
 
     def check(
-        self, user: str, agent: str, scope: str, resource: str, ttl: int
+        self,
+        user: str,
+        agent: str,
+        scope: str,
+        resource: str,
+        ttl: int,
+        issuer: str = ISSUER_ID,
     ) -> Grant:
         """Validate a request against policy. Returns the grant (TTL clamped).
 
         Raises PolicyError if anything is not permitted.
         """
-        grant = self.grant_for(user, agent)
+        grant = self.grant_for(user, agent, issuer)
         if grant is None:
+            who = user if issuer == ISSUER_ID else f"{user!r}@{issuer}"
             raise PolicyError(
-                f"no delegation grant for user={user!r} agent={agent!r} "
-                "(deny by default)"
+                f"no delegation grant for user={who!r} agent={agent!r} "
+                "(deny by default)",
+                code="no_grant",
             )
         if not isinstance(scope, str) or not isinstance(resource, str):
             raise PolicyError("scope and resource must be strings")
@@ -74,16 +86,18 @@ class Policy:
             # Finding #8: a scope-less delegation is almost certainly a
             # caller bug; fail closed rather than mint a bearer token
             # with no stated purpose.
-            raise PolicyError("scope must not be empty")
+            raise PolicyError("scope must not be empty", code="scope")
         unknown = wanted - grant.scopes
         if unknown:
             raise PolicyError(
                 f"scope(s) not granted: {sorted(unknown)} "
-                f"(grant allows: {sorted(grant.scopes)})"
+                f"(grant allows: {sorted(grant.scopes)})",
+                code="scope",
             )
         if resource not in grant.resources:
             raise PolicyError(
-                f"resource {resource!r} not granted (grant allows: {grant.resources})"
+                f"resource {resource!r} not granted (grant allows: {grant.resources})",
+                code="resource",
             )
         if ttl <= 0:
             raise PolicyError("ttl must be positive")
@@ -94,7 +108,17 @@ class Policy:
 
 
 class PolicyError(Exception):
-    pass
+    """A delegation request is not permitted.
+
+    ``code`` maps the denial to an OAuth error (used by the RFC 8693
+    ``/token`` endpoint): ``no_grant`` → ``invalid_grant``, ``scope`` →
+    ``invalid_scope``, ``resource`` → ``invalid_target``, ``request`` →
+    ``invalid_request``.
+    """
+
+    def __init__(self, message: str, code: str = "request"):
+        super().__init__(message)
+        self.code = code
 
 
 def policy_path(base: Path | None = None) -> Path:
@@ -134,6 +158,7 @@ def load(base: Path | None = None) -> Policy:
                 resources=list(g.get("resources", []) or []),
                 max_ttl=int(g.get("max_ttl", MAX_TTL)),
                 single_use=bool(g.get("single_use", False)),
+                issuer=str(g.get("issuer") or ISSUER_ID),
             )
         )
     return Policy(

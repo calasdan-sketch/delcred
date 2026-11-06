@@ -15,7 +15,6 @@ exchange — every broker key is born from a policy-checked delegation.
 
 from __future__ import annotations
 
-import fcntl
 import hashlib
 import hmac
 import json
@@ -27,11 +26,12 @@ from pathlib import Path
 from typing import Any
 
 from ._common import KEY_PREFIX, home
+from ._lock import atomic_rewrite, file_lock
 from .audit import AuditLog
 from .revocation import RevocationList
 from .tokens import InvalidToken, decode_unverified
 
-# fcntl locks are process-associated (see revocation.py): this module-level
+# OS file locks are process-associated (see revocation.py): this module-level
 # lock provides the intra-process half of mutual exclusion for the broker
 # file. Never nest it.
 _thread_lock = threading.Lock()
@@ -53,6 +53,21 @@ class BrokerError(Exception):
     pass
 
 
+class BrokerScopeError(BrokerError):
+    """The key is valid for this resource but lacks required scopes.
+
+    Distinct from the uniform "invalid API key" so resource servers can
+    answer 403 ``insufficient_scope`` (step up) instead of 401 — exactly as
+    for JWTs. It is raised only after the key, expiry, revocation and
+    resource checks all pass, so it reveals nothing to a key-guesser.
+    """
+
+    def __init__(self, required: list[str], missing: list[str]):
+        self.required = required
+        self.missing = missing
+        super().__init__(f"insufficient scope: missing {missing}")
+
+
 class Broker:
     """Issues and redeems opaque ephemeral keys backed by delegation records."""
 
@@ -64,29 +79,25 @@ class Broker:
         self.audit = AuditLog(self.base)
 
     def _append(self, record: dict[str, Any]) -> None:
-        with _thread_lock, open(self.path, "a") as f:
-            fcntl.flock(f, fcntl.LOCK_EX)
-            try:
-                f.write(json.dumps(record) + "\n")
-                f.flush()
-                os.fsync(f.fileno())
-            finally:
-                fcntl.flock(f, fcntl.LOCK_UN)
+        with _thread_lock, file_lock(self.path), open(
+            self.path, "a", encoding="utf-8"
+        ) as f:
+            f.write(json.dumps(record) + "\n")
+            f.flush()
+            os.fsync(f.fileno())
 
     def _records(self) -> list[dict[str, Any]]:
         rows = []
-        with _thread_lock, open(self.path) as f:
-            fcntl.flock(f, fcntl.LOCK_SH)
-            try:
-                for line in f:
-                    line = line.strip()
-                    if line:
-                        try:
-                            rows.append(json.loads(line))
-                        except json.JSONDecodeError:
-                            continue
-            finally:
-                fcntl.flock(f, fcntl.LOCK_UN)
+        with _thread_lock, file_lock(self.path, shared=True), open(
+            self.path, encoding="utf-8"
+        ) as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    try:
+                        rows.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        continue
         return rows
 
     def issue(
@@ -100,6 +111,7 @@ class Broker:
         delegation_jwt: str,
         single_use: bool = False,
         label: str = "",
+        user_iss: str | None = None,
     ) -> str:
         """Create an opaque key bound to an already-minted delegation JWT."""
         raw = KEY_PREFIX + secrets.token_urlsafe(32)
@@ -116,6 +128,7 @@ class Broker:
                 # the JWT's jti also kills this key.
                 "delegation_jti": delegation_jti,
                 "user": user,
+                "user_iss": user_iss,
                 "agent": agent,
                 "scope": scope,
                 "resource": resource,
@@ -134,25 +147,40 @@ class Broker:
         self.audit.record("broker_redeem_failed", reason=reason, **fields)
         return BrokerError("invalid API key")
 
+    def _find(self, key: str) -> dict[str, Any] | None:
+        if not isinstance(key, str) or not key:
+            return None
+        want = _hash(key)
+        match: dict[str, Any] | None = None
+        # Scan every record (no early exit) so lookup time does not depend
+        # on where — or whether — the key sits in the file.
+        for rec in self._records():
+            if hmac.compare_digest(str(rec.get("key_hash", "")), want) and match is None:
+                match = rec
+        return match
+
+    @staticmethod
+    def _claims(rec: dict[str, Any]) -> dict[str, Any]:
+        claims = {
+            "jti": rec["jti"],
+            "kind": "delegation",
+            "sub": rec["user"],
+            "act": {"sub": rec["agent"]},
+        }
+        if rec.get("user_iss"):
+            claims["user_iss"] = rec["user_iss"]
+        return claims
+
     def check(self, key: str) -> bool:
         """Non-consuming validity check (no single-use burn).
 
         Used by the sidecar to re-validate cached broker keys.
         Returns True only if the key would redeem successfully.
         """
-        want = _hash(key)
-        match: dict[str, Any] | None = None
-        for rec in self._records():
-            if hmac.compare_digest(rec.get("key_hash", ""), want):
-                match = rec
-                break
+        match = self._find(key)
         if match is None or match["expires_at"] < _now():
             return False
-        claims = {
-            "jti": match["jti"],
-            "sub": match["user"],
-            "act": {"sub": match["agent"]},
-        }
+        claims = self._claims(match)
         revoked, _ = self.revocations.is_revoked(claims)
         if not revoked and match.get("delegation_jti"):
             revoked, _ = self.revocations.is_revoked(
@@ -162,28 +190,32 @@ class Broker:
         # then mints a fresh one instead of serving a dead credential.
         return not revoked
 
-    def redeem(self, key: str) -> dict[str, Any]:
+    def redeem(
+        self,
+        key: str,
+        *,
+        expected_resource: str | None = None,
+        required_scopes: str | list[str] | set[str] | None = None,
+    ) -> dict[str, Any]:
         """Validate an opaque key → capability record. Burns single-use keys.
 
+        ``expected_resource`` (strongly recommended) pins the key to the
+        API redeeming it — the same confused-deputy defense as JWT audience
+        checks. ``required_scopes`` enforces least privilege per operation.
+        Both are checked *before* a single-use key is burned, so presenting a
+        key to the wrong API does not destroy it.
+
         Raises BrokerError("invalid API key") on any failure — unknown,
-        expired, or revoked are indistinguishable by design.
+        expired, revoked, wrong resource or missing scope are
+        indistinguishable by design (the audit log records which).
         """
-        want = _hash(key)
-        match: dict[str, Any] | None = None
-        for rec in self._records():
-            if hmac.compare_digest(rec.get("key_hash", ""), want):
-                match = rec
-                break
+        match = self._find(key)
         if match is None:
             raise self._reject("unknown_key")
         now = _now()
         if match["expires_at"] < now:
             raise self._reject("expired", jti=match["jti"])
-        claims = {
-            "jti": match["jti"],
-            "sub": match["user"],
-            "act": {"sub": match["agent"]},
-        }
+        claims = self._claims(match)
         revoked, why = self.revocations.is_revoked(claims)
         # Finding #1: also honor revocation of the bound delegation JWT.
         if not revoked and match.get("delegation_jti"):
@@ -192,6 +224,24 @@ class Broker:
             )
         if revoked:
             raise self._reject("revoked", jti=match["jti"], detail=why)
+        if expected_resource is not None and match["resource"] != expected_resource:
+            raise self._reject("wrong_resource", jti=match["jti"])
+        if required_scopes:
+            from .tokens import normalize_scopes
+
+            missing = normalize_scopes(required_scopes) - set(
+                str(match.get("scope", "")).split()
+            )
+            if missing:
+                self.audit.record(
+                    "broker_redeem_failed",
+                    reason="insufficient_scope",
+                    jti=match["jti"],
+                    missing=sorted(missing),
+                )
+                raise BrokerScopeError(
+                    sorted(normalize_scopes(required_scopes)), sorted(missing)
+                )
         if match.get("single_use"):
             # Atomic burn: exactly one concurrent redeem wins; the losers get
             # the uniform "invalid API key" (no double-spend, no oracle).
@@ -220,16 +270,15 @@ class Broker:
 
     def revoke_key(self, key: str, reason: str = "") -> bool:
         """Revoke by raw key value (hashes it, denylists the record's jti)."""
-        want = _hash(key)
-        for rec in self._records():
-            if hmac.compare_digest(rec.get("key_hash", ""), want):
-                self.revocations.revoke_jti(
-                    rec["jti"],
-                    reason=reason or "broker key revoked",
-                    expires_at=rec["expires_at"],
-                )
-                return True
-        return False
+        rec = self._find(key)
+        if rec is None:
+            return False
+        self.revocations.revoke_jti(
+            rec["jti"],
+            reason=reason or "broker key revoked",
+            expires_at=rec["expires_at"],
+        )
+        return True
 
     def prune(self) -> int:
         """Drop expired records. Returns number removed.
@@ -238,11 +287,9 @@ class Broker:
         keys issued concurrently (mid-prune) are never lost to the replace.
         """
         now = _now()
-        with _thread_lock, open(self.path, "a+") as f:
-            fcntl.flock(f, fcntl.LOCK_EX)
-            try:
-                f.seek(0)
-                kept, dropped = [], 0
+        with _thread_lock, file_lock(self.path):
+            kept, dropped = [], 0
+            with open(self.path, encoding="utf-8") as f:
                 for line in f:
                     line = line.strip()
                     if not line:
@@ -254,15 +301,7 @@ class Broker:
                     if r.get("expires_at", 0) < now:
                         dropped += 1
                         continue
-                    kept.append(r)
-                if dropped:
-                    tmp = self.path.with_suffix(".tmp")
-                    with open(tmp, "w") as tf:
-                        for r in kept:
-                            tf.write(json.dumps(r) + "\n")
-                        tf.flush()
-                        os.fsync(tf.fileno())
-                    os.replace(tmp, self.path)
-                return dropped
-            finally:
-                fcntl.flock(f, fcntl.LOCK_UN)
+                    kept.append(json.dumps(r))
+            if dropped:
+                atomic_rewrite(self.path, kept)
+            return dropped

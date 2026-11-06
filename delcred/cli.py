@@ -17,7 +17,7 @@ from delcred.exchange import TOKEN_TYPE_BROKER_KEY, ExchangeError
 from delcred.policy import PolicyError, policy_path
 from delcred.policy import load as load_policy
 from delcred.revocation import RevocationList
-from delcred.tokens import TokenError, decode_unverified
+from delcred.tokens import InsufficientScope, TokenError, decode_unverified
 
 
 def _base(args) -> Path:
@@ -46,24 +46,39 @@ def cmd_user_token(args):
     print(delcred.user_token(args.user_id, ttl=args.ttl, base=_base(args)))
 
 
+def _read_file_secret(path: str) -> str:
+    p = Path(os.path.expanduser(path))
+    try:
+        value = p.read_text(encoding="utf-8").strip()
+    except OSError as e:
+        sys.exit(f"cannot read token file {p}: {e.strerror or e}")
+    if not value:
+        sys.exit(f"token file {p} is empty")
+    return value
+
+
 def _read_secret(args, name: str, env: str) -> str:
-    """Read a token from --<name>, --<name>-file, or $<env> (in that order).
+    """Read a token from --<name>, --<name>-file, $<env> or $<env>_FILE.
 
     Finding #7: passing tokens as CLI args leaks them via `ps`; prefer
-    the -file or env forms in scripts.
+    the -file or env forms in scripts. ``$<env>_FILE`` follows the Docker
+    secrets convention (path to a file holding the token).
     """
     direct = getattr(args, name, None)
     if direct:
         return direct
     path = getattr(args, f"{name}_file", None)
     if path:
-        return Path(path).read_text().strip()
+        return _read_file_secret(path)
     value = os.environ.get(env)
     if value:
         return value.strip()
+    path = os.environ.get(env + "_FILE")
+    if path:
+        return _read_file_secret(path)
     sys.exit(
         f"need one of --{name.replace('_', '-')} / "
-        f"--{name.replace('_', '-')}-file / ${env}"
+        f"--{name.replace('_', '-')}-file / ${env} / ${env}_FILE"
     )
 
 
@@ -105,8 +120,14 @@ def cmd_exchange(args):
 def cmd_verify(args):
     try:
         claims = delcred.verify(
-            args.token, expected_resource=args.resource, base=_base(args)
+            args.token,
+            expected_resource=args.resource,
+            required_scopes=args.require_scope or None,
+            base=_base(args),
         )
+    except InsufficientScope as e:
+        print(f"INSUFFICIENT_SCOPE: missing {' '.join(e.missing)}", file=sys.stderr)
+        sys.exit(5)
     except (TokenError, ExchangeError) as e:
         print(f"INVALID: {e}", file=sys.stderr)
         sys.exit(4)
@@ -127,7 +148,12 @@ def cmd_inspect(args):
 
 def cmd_broker_redeem(args):
     try:
-        rec = delcred.verify_broker_key(args.key, base=_base(args))
+        rec = delcred.verify_broker_key(
+            args.key,
+            base=_base(args),
+            expected_resource=args.resource,
+            required_scopes=args.require_scope or None,
+        )
     except BrokerError as e:
         print(f"REJECTED: {e}", file=sys.stderr)
         sys.exit(4)
@@ -145,8 +171,9 @@ def cmd_revoke(args):
         delcred.revoke_agent(args.agent, reason=args.reason, base=h)
         print(f"revoked ALL credentials for agent {args.agent!r} (user unaffected)")
     elif args.user:
-        delcred.revoke_user(args.user, reason=args.reason, base=h)
-        print(f"revoked ALL delegations by user {args.user!r}")
+        delcred.revoke_user(args.user, reason=args.reason, base=h, issuer=args.issuer)
+        scope_ = f" from issuer {args.issuer}" if args.issuer else " (every issuer)"
+        print(f"revoked ALL delegations by user {args.user!r}{scope_}")
     else:
         print("nothing to revoke: need one of --jti, --agent, --user", file=sys.stderr)
         sys.exit(2)
@@ -189,7 +216,9 @@ def cmd_trust_add(args):
     from delcred.trust import TrustConfigError, add_trusted_issuer
 
     try:
-        dest = add_trusted_issuer(args.iss, args.key_file, base=_base(args))
+        dest = add_trusted_issuer(
+            args.iss, args.key_file, base=_base(args), audience=args.audience
+        )
     except TrustConfigError as e:
         print(f"trust-add failed: {e}", file=sys.stderr)
         sys.exit(3)
@@ -198,14 +227,118 @@ def cmd_trust_add(args):
 
 
 def cmd_audit(args):
-    for e in AuditLog(_base(args)).tail(args.tail):
+    log = AuditLog(_base(args))
+    if args.action == "verify":
+        res = log.verify()
+        if res.ok:
+            print(
+                f"OK  {res.chained} hash-chained entries"
+                + (f" (+{res.legacy} legacy, pre-0.3, unchained)" if res.legacy else "")
+                + f"\nhead {res.head}"
+            )
+            print("Anchor the head hash outside this host to also detect truncation.")
+            return
+        print(f"TAMPERED  {len(res.problems)} problem(s):", file=sys.stderr)
+        for prob in res.problems[:50]:
+            print(f"  {prob}", file=sys.stderr)
+        sys.exit(6)
+    if args.action == "head":
+        print(log.head())
+        return
+    since = None
+    if args.since:
+        import time as _t
+
+        since = int(_t.time()) - _parse_duration(args.since)
+    for e in log.tail(
+        args.tail, event=args.event, agent=args.agent, user=args.user, since=since
+    ):
         print(json.dumps(e))
+
+
+def _parse_duration(text: str) -> int:
+    """'90', '90s', '15m', '2h', '7d' → seconds."""
+    units = {"s": 1, "m": 60, "h": 3600, "d": 86400}
+    t = text.strip().lower()
+    mult = units.get(t[-1:], None)
+    num = t[:-1] if mult else t
+    try:
+        n = int(num)
+    except ValueError:
+        sys.exit(f"bad duration {text!r}; use e.g. 90s, 15m, 2h, 7d")
+    if n < 0:
+        sys.exit("duration must be positive")
+    return n * (mult or 1)
+
+
+def cmd_jwks(args):
+    print(json.dumps(delcred.jwks(base=_base(args)), indent=2))
+
+
+def cmd_prune(args):
+    h = _base(args)
+    r = RevocationList(h).prune()
+    b = Broker(h).prune()
+    print(f"pruned {r} expired revocation entr{'y' if r == 1 else 'ies'}, {b} expired broker record(s)")
+
+
+def cmd_mcp_headers(args):
+    """Claude Code `headersHelper`: print {"Authorization": "Bearer …"} JSON.
+
+    Claude Code runs the helper on each MCP connection and sets
+    $CLAUDE_CODE_MCP_SERVER_URL; that URL is the default resource, so the
+    token's audience is exactly the MCP server being connected to.
+    """
+    resource = args.resource or os.environ.get("CLAUDE_CODE_MCP_SERVER_URL")
+    if not resource:
+        sys.exit("need --resource or $CLAUDE_CODE_MCP_SERVER_URL")
+    scope = args.scope or os.environ.get("DELCRED_SCOPE")
+    if not scope:
+        sys.exit("need --scope or $DELCRED_SCOPE")
+    subject_token = _read_secret(args, "subject_token", "DELCRED_SUBJECT_TOKEN")
+    actor_token = _read_secret(args, "actor_token", "DELCRED_ACTOR_TOKEN")
+    from delcred.exchange import exchange as _exchange
+
+    try:
+        result = _exchange(
+            subject_token=subject_token,
+            actor_token=actor_token,
+            scope=scope,
+            resource=resource,
+            requested_token_type=(
+                TOKEN_TYPE_BROKER_KEY if args.as_api_key else "urn:ietf:params:oauth:token-type:jwt"
+            ),
+            ttl=args.ttl,
+            base=_base(args),
+        )
+    except (ExchangeError, PolicyError) as e:
+        print(f"delcred: delegation denied for {resource}: {e}", file=sys.stderr)
+        sys.exit(3)
+    # stdout carries ONLY the JSON object Claude Code parses.
+    sys.stdout.write(json.dumps({"Authorization": f"Bearer {result.credential}"}))
+    sys.stdout.flush()
+
+
+def cmd_demo(args):
+    from delcred.demo import run_demo
+
+    if not run_demo():
+        sys.exit(1)
 
 
 def cmd_serve(args):
     from delcred.server import serve
 
-    serve(port=args.port, base=_base(args))
+    admin = None
+    if args.admin_token_file:
+        admin = _read_file_secret(args.admin_token_file)
+    serve(
+        port=args.port,
+        base=_base(args),
+        rate=args.rate_limit,
+        admin_token=admin,
+        public_url=args.public_url,
+    )
 
 
 def cmd_sidecar(args):
@@ -295,6 +428,12 @@ def build_parser() -> argparse.ArgumentParser:
         required=True,
         help="REQUIRED: enforce audience pinning (confused-deputy defense)",
     )
+    s.add_argument(
+        "--require-scope",
+        action="append",
+        metavar="SCOPE",
+        help="scope this operation needs (repeatable); exit 5 if missing",
+    )
     s.add_argument("--json", action="store_true")
     s.set_defaults(func=cmd_verify)
 
@@ -306,12 +445,17 @@ def build_parser() -> argparse.ArgumentParser:
     bs = s.add_subparsers(dest="brokercmd", required=True)
     r = bs.add_parser("redeem", help="redeem a dk_… key → capability record")
     r.add_argument("key")
+    r.add_argument("--resource", help="pin redemption to this API (recommended)")
+    r.add_argument("--require-scope", action="append", metavar="SCOPE")
     r.set_defaults(func=cmd_broker_redeem)
 
     s = sub.add_parser("revoke", help="revoke a token, agent, or user")
     s.add_argument("--jti")
     s.add_argument("--agent")
     s.add_argument("--user")
+    s.add_argument(
+        "--issuer", help="with --user: only that IdP's user (default: the id under every issuer)"
+    )
     s.add_argument("--reason", default="")
     s.set_defaults(func=cmd_revoke)
 
@@ -328,12 +472,62 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("status", help="show home/policy/revocation state")
     s.set_defaults(func=cmd_status)
 
-    s = sub.add_parser("audit", help="show recent audit events (no secrets)")
+    s = sub.add_parser(
+        "audit",
+        help="show / verify the tamper-evident audit log (no secrets)",
+        description="audit [show]: recent events; audit verify: check the hash "
+        "chain (exit 6 if tampered); audit head: print the newest hash to anchor.",
+    )
+    s.add_argument("action", nargs="?", default="show", choices=["show", "verify", "head"])
     s.add_argument("--tail", type=int, default=20)
+    s.add_argument("--event", help="only this event type, e.g. token_issued")
+    s.add_argument("--agent")
+    s.add_argument("--user")
+    s.add_argument("--since", help="only events newer than e.g. 15m, 2h, 7d")
     s.set_defaults(func=cmd_audit)
+
+    s = sub.add_parser("jwks", help="print the issuer's public JWK Set")
+    s.set_defaults(func=cmd_jwks)
+
+    s = sub.add_parser("prune", help="drop expired revocation + broker records")
+    s.set_defaults(func=cmd_prune)
+
+    s = sub.add_parser(
+        "demo", help="zero-config, self-checking tour in a throwaway home"
+    )
+    s.set_defaults(func=cmd_demo)
+
+    s = sub.add_parser(
+        "mcp-headers",
+        help="Claude Code headersHelper: print a fresh delegated Authorization header",
+    )
+    s.add_argument("--scope", help="scopes to delegate (or $DELCRED_SCOPE)")
+    s.add_argument(
+        "--resource",
+        help="audience (default: $CLAUDE_CODE_MCP_SERVER_URL set by Claude Code)",
+    )
+    s.add_argument("--subject-token", help=argparse.SUPPRESS)
+    s.add_argument("--subject-token-file", help="file holding the user token")
+    s.add_argument("--actor-token", help=argparse.SUPPRESS)
+    s.add_argument("--actor-token-file", help="file holding the agent token")
+    s.add_argument("--ttl", type=int, default=900)
+    s.add_argument("--as-api-key", action="store_true")
+    s.set_defaults(func=cmd_mcp_headers)
 
     s = sub.add_parser("serve", help="run the HTTP exchange API")
     s.add_argument("--port", type=int, default=8400)
+    s.add_argument(
+        "--rate-limit", type=int, default=60,
+        help="max /token, /exchange, /revoke requests per minute per client IP (0 = off)",
+    )
+    s.add_argument(
+        "--admin-token-file",
+        help="file holding the bearer token /revoke requires (or $DELCRED_ADMIN_TOKEN); "
+        "without one, /revoke accepts loopback clients only",
+    )
+    s.add_argument(
+        "--public-url", help="external base URL, used as issuer in RFC 8414 metadata"
+    )
     s.set_defaults(func=cmd_serve)
 
     s = sub.add_parser("sidecar", help="run the credential-injecting forward proxy")
@@ -367,6 +561,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--key-file",
         required=True,
         help="PEM file with the issuer's Ed25519 public key",
+    )
+    s.add_argument(
+        "--audience",
+        help="aud the IdP's subject tokens must carry (default: 'delcred')",
     )
     s.set_defaults(func=cmd_trust_add)
 

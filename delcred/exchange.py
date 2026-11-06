@@ -69,7 +69,10 @@ def exchange(
 
     # 1. Validate both input tokens (signature → issuer → expiry).
     try:
-        sub_claims = tokens.verify_signature(subject_token, base=home_)
+        # Only the subject may come from a trusted external IdP.
+        sub_claims = tokens.verify_signature(
+            subject_token, base=home_, allow_external=True
+        )
     except (InvalidToken, ExpiredToken) as e:
         audit.record("exchange_failed", reason="bad_subject_token", detail=str(e))
         raise ExchangeError(f"subject_token rejected: {e}") from e
@@ -89,6 +92,7 @@ def exchange(
         raise ExchangeError("subject_token must identify a user, not an agent")
     _require_kind(act_claims, "agent", "actor")
     user = sub_claims["sub"]
+    user_iss = tokens.user_issuer(sub_claims)
     agent = act_claims["sub"]
 
     # 3. Neither party may be revoked.
@@ -103,7 +107,7 @@ def exchange(
     # 4. Policy check: deny by default, scope ⊆ grant, exact resource match.
     policy = load_policy(home_)
     try:
-        grant = policy.check(user, agent, scope, resource, ttl)
+        grant = policy.check(user, agent, scope, resource, ttl, issuer=user_iss)
     except PolicyError as e:
         audit.record(
             "exchange_denied",
@@ -125,6 +129,7 @@ def exchange(
         resource=resource,
         ttl=effective_ttl,
         single_use=single_use,
+        user_iss=user_iss,
         base=home_,
     )
     claims = tokens.decode_unverified(delegation_jwt)
@@ -139,6 +144,7 @@ def exchange(
             ttl=effective_ttl,
             delegation_jwt=delegation_jwt,
             single_use=single_use,
+            user_iss=user_iss,
         )
         audit.record(
             "broker_issued",
@@ -173,13 +179,19 @@ def verify(
     token: str,
     *,
     expected_resource: str,
+    required_scopes: str | list[str] | set[str] | None = None,
     base: Path | None = None,
 ) -> dict[str, Any]:
-    """Full verification: signature → expiry → revocation → audience.
+    """Full verification: signature → expiry → audience → scope → revocation.
 
     ``expected_resource`` is REQUIRED (finding #2): verifying without an
     audience is a confused-deputy hole. Use ``tokens.decode_unverified``
     (or the ``inspect`` CLI command) for debug-only peeks.
+
+    ``required_scopes`` (recommended): scopes this operation needs; a token
+    lacking any of them raises :class:`delcred.InsufficientScope` (→ HTTP
+    403 ``insufficient_scope``). Checked *before* the single-use burn, so a
+    token presented for the wrong operation is not destroyed.
 
     Single-use tokens are burned atomically on first successful verify.
     Raises tokens.TokenError or ExchangeError.
@@ -188,9 +200,22 @@ def verify(
     audit = AuditLog(home_)
     revocations = RevocationList(home_)
 
-    claims = tokens.verify_delegation_token(
-        token, expected_resource=expected_resource, base=home_
-    )
+    if not isinstance(expected_resource, str) or not expected_resource:
+        raise ExchangeError("expected_resource is required (audience pinning)")
+    try:
+        claims = tokens.verify_delegation_token(
+            token,
+            expected_resource=expected_resource,
+            required_scopes=required_scopes,
+            base=home_,
+        )
+    except tokens.InsufficientScope as e:
+        audit.record(
+            "verify_insufficient_scope",
+            resource=expected_resource,
+            missing=e.missing,
+        )
+        raise
     revoked, why = revocations.is_revoked(claims)
     if revoked:
         audit.record(
@@ -199,7 +224,7 @@ def verify(
             user=claims.get("sub"),
             agent=(claims.get("act") or {}).get("sub"),
         )
-        raise ExchangeError(f"token revoked: {why}")
+        raise ExchangeError(why)
     if claims.get("single_use"):
         # Burn atomically: exactly one concurrent verify wins; the losers are
         # rejected. +300s grace so the burn outlives the token's exp +

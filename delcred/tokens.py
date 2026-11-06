@@ -11,6 +11,11 @@ Claim model (RFC 8693-flavoured)::
     jti:      unique token id                # revocation handle
     iat/nbf/exp as usual; nbf == iat.
 
+Issuer rule: delegation, agent and local user tokens MUST be signed by the
+local issuer (``iss == "delcred"``). Trusted external IdPs are accepted only
+for the ``subject_token`` of an exchange (``allow_external=True``), and their
+tokens must carry the configured audience.
+
 Verification order (panel-mandated): parse → signature → issuer trust →
 expiry/nbf → revocation → scope/audience. ``verify_*`` does everything up to
 expiry; revocation is checked by the caller (exchange/broker/verify command)
@@ -44,6 +49,35 @@ class InvalidToken(TokenError):
     pass
 
 
+class InsufficientScope(TokenError):
+    """The token is valid but lacks scopes the operation requires.
+
+    Maps to HTTP 403 + ``WWW-Authenticate: Bearer error="insufficient_scope"``
+    (RFC 6750 §3.1, MCP authorization spec). ``required``/``missing`` are
+    sorted lists of scope strings.
+    """
+
+    def __init__(self, required: list[str], missing: list[str], granted: list[str]):
+        self.required = required
+        self.missing = missing
+        self.granted = granted
+        super().__init__(f"insufficient scope: missing {missing} (token grants {granted})")
+
+
+def normalize_scopes(scopes: str | list[str] | set[str] | tuple[str, ...] | None) -> set[str]:
+    """Accept ``"a b"`` or ``["a", "b"]`` → ``{"a", "b"}`` (whitespace-split)."""
+    if scopes is None:
+        return set()
+    if isinstance(scopes, str):
+        return set(scopes.split())
+    out: set[str] = set()
+    for s in scopes:
+        if not isinstance(s, str):
+            raise TypeError("scopes must be strings")
+        out.update(s.split())
+    return out
+
+
 def _now() -> int:
     return int(time.time())
 
@@ -60,6 +94,13 @@ def _signing_key_pem(priv: Ed25519PrivateKey) -> bytes:
     )
 
 
+def _headers(priv: Ed25519PrivateKey, typ: str | None = None) -> dict[str, str]:
+    h = {"kid": _keys.key_id(priv.public_key())}
+    if typ:
+        h["typ"] = typ
+    return h
+
+
 def mint_delegation_token(
     *,
     user: str,
@@ -68,9 +109,15 @@ def mint_delegation_token(
     resource: str,
     ttl: int = DEFAULT_TTL,
     single_use: bool = False,
+    user_iss: str = ISSUER_ID,
     base: Path | None = None,
 ) -> str:
-    """Mint a delegation JWT: ``sub``=user, ``act``=agent, pinned to ``resource``."""
+    """Mint a delegation JWT: ``sub``=user, ``act``=agent, pinned to ``resource``.
+
+    ``user_iss`` records which issuer vouched for the user, so users are
+    identified by ``(user_iss, sub)`` — ``u_1`` from an IdP is not the local
+    ``u_1``.
+    """
     if not user or not agent:
         raise ValueError("user and agent are required")
     if not resource:
@@ -81,6 +128,7 @@ def mint_delegation_token(
         "sub": user,
         "act": {"sub": agent},
         "kind": "delegation",
+        "user_iss": user_iss,
         "scope": " ".join(sorted(set(scope.split()))),
         "aud": resource,
         "jti": _new_jti(),
@@ -95,7 +143,7 @@ def mint_delegation_token(
         claims,
         _signing_key_pem(priv),
         algorithm="EdDSA",
-        headers={"typ": "at+jwt"},
+        headers=_headers(priv, "at+jwt"),
     )
 
 
@@ -112,7 +160,9 @@ def mint_agent_token(agent_id: str, ttl: int = 86400, base: Path | None = None) 
         "exp": now + ttl,
     }
     priv = _keys.load_private(base)
-    return jwt.encode(claims, _signing_key_pem(priv), algorithm="EdDSA")
+    return jwt.encode(
+        claims, _signing_key_pem(priv), algorithm="EdDSA", headers=_headers(priv)
+    )
 
 
 def mint_user_token(user_id: str, ttl: int = 3600, base: Path | None = None) -> str:
@@ -128,7 +178,9 @@ def mint_user_token(user_id: str, ttl: int = 3600, base: Path | None = None) -> 
         "exp": now + ttl,
     }
     priv = _keys.load_private(base)
-    return jwt.encode(claims, _signing_key_pem(priv), algorithm="EdDSA")
+    return jwt.encode(
+        claims, _signing_key_pem(priv), algorithm="EdDSA", headers=_headers(priv)
+    )
 
 
 def decode_unverified(token: str) -> dict[str, Any]:
@@ -139,7 +191,9 @@ def decode_unverified(token: str) -> dict[str, Any]:
         raise InvalidToken(f"malformed token: {e}") from e
 
 
-def _key_for_issuer(token: str, base: Path | None) -> tuple[bytes, list[str], str]:
+def _key_for_issuer(
+    token: str, base: Path | None, allow_external: bool = False
+) -> tuple[bytes, list[str], str, str | None]:
     """Select the verification key and required claims from the token's ``iss``.
 
     Returns ``(public_key_pem, required_claims, issuer)``. The local issuer
@@ -167,31 +221,39 @@ def _key_for_issuer(token: str, base: Path | None) -> tuple[bytes, list[str], st
     iss = unverified.get("iss")
     if iss == ISSUER_ID:
         pub = _keys.load_public(base)
+        kid = headers.get("kid")
+        if kid is not None and kid != _keys.key_id(pub):
+            raise InvalidToken(
+                "token was signed by a different issuer key (kid mismatch) — "
+                "the key was rotated or the token comes from another delcred home"
+            )
         pem = pub.public_bytes(
             serialization.Encoding.PEM,
             serialization.PublicFormat.SubjectPublicKeyInfo,
         )
-        return pem, ["exp", "iat", "nbf", "iss", "sub", "jti"], iss
+        return pem, ["exp", "iat", "nbf", "iss", "sub", "jti"], iss, None
+    if not allow_external:
+        raise InvalidToken(
+            f"untrusted issuer {iss!r} for this token — only the local issuer "
+            f"{ISSUER_ID!r} may sign delegation/agent tokens; external IdP "
+            "tokens are only accepted as an exchange subject_token"
+        )
     try:
-        trusted = _trust.trusted_issuers(base)
+        trusted = _trust.trusted_issuer_configs(base)
     except _trust.TrustConfigError as e:
         raise InvalidToken(f"bad trusted_issuers config: {e}") from e
-    key = trusted.get(iss) if isinstance(iss, str) else None
-    if key is None:
+    cfg = trusted.get(iss) if isinstance(iss, str) else None
+    if cfg is None:
         raise InvalidToken(
             f"untrusted issuer {iss!r} — local issuer is {ISSUER_ID!r}; "
             "register external IdPs with `delcred trust-add`"
         )
+    key, audience = cfg
     pem = key.public_bytes(
         serialization.Encoding.PEM,
         serialization.PublicFormat.SubjectPublicKeyInfo,
     )
-    return pem, ["exp", "iss", "sub"], iss
-    """Decode claims without verifying — for inspection only, never trust."""
-    try:
-        return jwt.decode(token, options={"verify_signature": False})
-    except jwt.PyJWTError as e:
-        raise InvalidToken(f"malformed token: {e}") from e
+    return pem, ["exp", "iss", "sub", "aud"], iss, audience
 
 
 def verify_signature(
@@ -199,16 +261,20 @@ def verify_signature(
     *,
     leeway: int = CLOCK_SKEW_LEEWAY,
     base: Path | None = None,
+    allow_external: bool = False,
 ) -> dict[str, Any]:
-    """Strict verification: EdDSA only, issuer pinned, typ checked, expiry/nbf.
+    """Strict verification: EdDSA only, issuer pinned, expiry/nbf.
 
-    The verification key is selected from the token's ``iss``: the local
-    delcred issuer key, or a trusted external IdP registered via
-    ``policy.yaml`` ``trusted_issuers`` / ``delcred trust-add``.
+    By default only the local delcred issuer is accepted. With
+    ``allow_external=True`` (exchange subject tokens only) a trusted external
+    IdP registered via ``policy.yaml`` ``trusted_issuers`` / ``delcred
+    trust-add`` is also accepted, and its token's ``aud`` must contain the
+    audience configured for that issuer (default ``"delcred"``).
 
+    ``typ`` is checked by :func:`verify_delegation_token`, not here.
     Raises TokenError subclasses. Does NOT check revocation (caller does).
     """
-    pub_pem, required, issuer = _key_for_issuer(token, base)
+    pub_pem, required, issuer, audience = _key_for_issuer(token, base, allow_external)
     try:
         claims = jwt.decode(
             token,
@@ -216,18 +282,23 @@ def verify_signature(
             algorithms=["EdDSA"],
             issuer=issuer,
             leeway=leeway,
+            audience=audience,
             options={
                 "require": required,
-                # Audience is enforced explicitly by verify_delegation_token
-                # (confused-deputy defense with a clear error), not here, so
-                # that non-delegation tokens carrying aud are unaffected.
-                "verify_aud": False,
+                # Local tokens: audience is enforced explicitly by
+                # verify_delegation_token (clear confused-deputy error).
+                # External subject tokens: PyJWT enforces the configured aud.
+                "verify_aud": audience is not None,
             },
         )
     except jwt.ExpiredSignatureError as e:
         raise ExpiredToken("token expired") from e
     except jwt.InvalidIssuerError as e:
         raise InvalidToken(f"untrusted issuer: {e}") from e
+    except jwt.InvalidAudienceError as e:
+        raise InvalidToken(
+            f"subject token audience rejected: {e} (expected {audience!r})"
+        ) from e
     except jwt.PyJWTError as e:
         raise InvalidToken(f"token rejected: {e}") from e
     return claims
@@ -237,21 +308,43 @@ def verify_delegation_token(
     token: str,
     *,
     expected_resource: str | None = None,
+    required_scopes: str | list[str] | set[str] | None = None,
     leeway: int = CLOCK_SKEW_LEEWAY,
     base: Path | None = None,
 ) -> dict[str, Any]:
-    """Verify a delegation token and enforce audience pinning (confused-deputy defense)."""
+    """Verify a delegation token, enforce audience pinning (confused-deputy
+    defense) and, if given, that every ``required_scopes`` entry is granted
+    (least privilege per operation; raises :class:`InsufficientScope`)."""
     claims = verify_signature(token, leeway=leeway, base=base)
     if claims.get("kind") != "delegation":
         raise InvalidToken(f"not a delegation token (kind={claims.get('kind')!r})")
     if "act" not in claims or "sub" not in claims["act"]:
         raise InvalidToken("delegation token missing act.sub (agent identity)")
+    try:
+        typ = str(jwt.get_unverified_header(token).get("typ", "")).lower()
+    except jwt.PyJWTError as e:  # pragma: no cover - verify_signature parsed it
+        raise InvalidToken(f"malformed token header: {e}") from e
+    if typ not in ("at+jwt", "application/at+jwt"):
+        raise InvalidToken(f"not an access token (typ={typ!r}; expected 'at+jwt')")
     if expected_resource is not None and claims.get("aud") != expected_resource:
         raise InvalidToken(
             f"audience mismatch: token is for {claims.get('aud')!r}, "
             f"not {expected_resource!r}"
         )
+    need = normalize_scopes(required_scopes)
+    if need:
+        have = scopes_of(claims)
+        missing = need - have
+        if missing:
+            raise InsufficientScope(sorted(need), sorted(missing), sorted(have))
     return claims
+
+
+def user_issuer(claims: dict[str, Any]) -> str:
+    """Issuer that vouched for the human in ``claims`` (``(iss, sub)`` identity)."""
+    if claims.get("kind") == "delegation":
+        return str(claims.get("user_iss") or ISSUER_ID)
+    return str(claims.get("iss") or ISSUER_ID)
 
 
 def scopes_of(claims: dict[str, Any]) -> set[str]:
