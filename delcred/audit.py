@@ -305,7 +305,8 @@ class AuditLog:
             raise ValueError("not an audit checkpoint")
         base = self.path.parent
         pubs = _keys.verification_keys(base)
-        pub = pubs.get(header.get("kid")) if isinstance(header.get("kid"), str) else None
+        kid = header.get("kid")
+        pub = pubs.get(kid) if isinstance(kid, str) else None
         if pub is None:
             raise ValueError("checkpoint was signed by an unknown key")
         if not ed25519_verify(_keys.public_jwk(pub)["x"], signing_input, sig):

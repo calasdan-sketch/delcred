@@ -10,6 +10,7 @@ from pathlib import Path
 
 import delcred
 from delcred import keys as _keys
+from delcred._common import HomeError
 from delcred._common import home as _home
 from delcred._common import safe_text as _st
 from delcred.audit import AuditLog
@@ -26,7 +27,13 @@ def _base(args) -> Path:
 
 
 def cmd_init(args):
-    h = delcred.init(base=_base(args), force=args.force)
+    try:
+        h = delcred.init(base=_base(args), force=args.force)
+    except FileExistsError:
+        sys.exit(
+            f"already initialised: an issuer key exists in {_base(args)}. "
+            "`delcred init --force` replaces it, which invalidates every token and key issued so far."
+        )
     print(f"initialized delcred home at {h}")
     print("  issuer key : 0600, never leaves this directory")
     print(f"  policy     : {policy_path(h)}  (edit your grants there)")
@@ -64,12 +71,13 @@ def cmd_offline_verify(args):
     resource server sees."""
     from delcred.offline import verify_offline
 
-    jwks = json.loads(Path(args.jwks_file).expanduser().read_text())
-    bulletin = (
-        Path(args.bulletin_file).expanduser().read_text().strip() if args.bulletin_file else None
-    )
+    try:
+        jwks = json.loads(_read_text_arg(args.jwks_file, "JWKS file"))
+    except ValueError as e:
+        sys.exit(f"JWKS file {args.jwks_file} is not valid JSON: {_st(e, 200)}")
+    bulletin = _read_text_arg(args.bulletin_file, "bulletin file").strip() if args.bulletin_file else None
     v = verify_offline(
-        args.token,
+        _token_arg(args.token),
         jwks=jwks,
         resource=args.resource,
         required_scopes=args.require_scope or None,
@@ -78,9 +86,14 @@ def cmd_offline_verify(args):
     )
     if v.ok:
         c = v.claims
+        if args.json:
+            _jprint({"valid": True, "claims": c})
+            return
         print(f"VALID  sub={c['sub']} act={c['act']['sub']} scope={c['scope']!r} aud={c['aud']}")
         return
     print(f"INVALID: {_st(v.code)}: {_st(v.detail)}", file=sys.stderr)
+    if args.json:
+        _jprint({"valid": False, "code": _st(v.code), "detail": _st(v.detail)})
     sys.exit(5 if v.code == "insufficient_scope" else 4)
 
 
@@ -101,12 +114,38 @@ def cmd_user_token(args):
     print(delcred.user_token(args.user_id, ttl=args.ttl, base=_base(args)))
 
 
-def _read_file_secret(path: str) -> str:
+_MAX_TEXT_FILE = 1024 * 1024  # tokens are <= 16 KiB; JWKS/bulletins/checkpoints are small
+
+
+def _decode_text_file(raw: bytes, name: str) -> str:
+    """Decode a small text file the way Windows tools write it.
+
+    PowerShell 5's ``>`` writes UTF-16 with a BOM and Notepad may add a UTF-8
+    BOM; both are accepted. Anything else must be UTF-8.
+    """
+    if raw.startswith((b"\xff\xfe", b"\xfe\xff")):
+        return raw.decode("utf-16")
+    try:
+        return raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        sys.exit(f"{name} is not valid UTF-8 text; re-save it as UTF-8 (or ASCII)")
+
+
+def _read_text_arg(path: str, what: str) -> str:
     p = Path(os.path.expanduser(path))
     try:
-        value = p.read_text(encoding="utf-8").strip()
+        with open(p, "rb") as f:
+            raw = f.read(_MAX_TEXT_FILE + 1)
     except OSError as e:
-        sys.exit(f"cannot read token file {p}: {e.strerror or e}")
+        sys.exit(f"cannot read {what} {p}: {e.strerror or e}")
+    if len(raw) > _MAX_TEXT_FILE:
+        sys.exit(f"{what} {p} is larger than {_MAX_TEXT_FILE // 1024} KiB; that is not a token, key set or checkpoint")
+    return _decode_text_file(raw, f"{what} {p}")
+
+
+def _read_file_secret(path: str) -> str:
+    p = Path(os.path.expanduser(path))
+    value = _read_text_arg(path, "token file").strip()
     if not value:
         sys.exit(f"token file {p} is empty")
     return value
@@ -182,10 +221,25 @@ def cmd_exchange(args):
         )
 
 
+def _token_arg(value: str) -> str:
+    """A token given as ``-`` is read from stdin (keeps it out of `ps`)."""
+    if value != "-":
+        return value
+    text = _decode_text_file(sys.stdin.buffer.read(64 * 1024), "standard input").strip()
+    if not text:
+        sys.exit("no token on standard input")
+    return text.splitlines()[0].strip()
+
+
+def _jprint(obj) -> None:
+    """One JSON document on stdout (the --json contract); diagnostics stay on stderr."""
+    print(json.dumps(obj, indent=2, default=str, sort_keys=True))
+
+
 def cmd_verify(args):
     try:
         claims = delcred.verify(
-            args.token,
+            _token_arg(args.token),
             expected_resource=args.resource,
             required_scopes=args.require_scope or None,
             base=_base(args),
@@ -193,9 +247,13 @@ def cmd_verify(args):
         )
     except InsufficientScope as e:
         print(f"INSUFFICIENT_SCOPE: missing {_st(' '.join(e.missing))}", file=sys.stderr)
+        if args.json:
+            _jprint({"valid": False, "code": "insufficient_scope", "missing": [_st(m) for m in e.missing]})
         sys.exit(5)
     except (TokenError, ExchangeError) as e:
         print(f"INVALID: {_st(e)}", file=sys.stderr)
+        if args.json:
+            _jprint({"valid": False, "code": "invalid_token", "detail": _st(e)})
         sys.exit(4)
     if args.json:
         print(json.dumps(claims, indent=2, default=str))
@@ -209,7 +267,7 @@ def cmd_verify(args):
 
 def cmd_inspect(args):
     # Unverified decode — for debugging only; never trust this output.
-    print(json.dumps(decode_unverified(args.token), indent=2, default=str))
+    print(json.dumps(decode_unverified(_token_arg(args.token)), indent=2, default=str))
 
 
 def cmd_broker_redeem(args):
@@ -259,8 +317,13 @@ def cmd_policy_check(args):
         grant = pol.check(args.user, args.agent, args.scope, args.resource, args.ttl)
     except PolicyError as e:
         print(f"DENIED: {_st(e)}", file=sys.stderr)
+        if args.json:
+            _jprint({"allowed": False, "detail": _st(e)})
         sys.exit(3)
     ttl = pol.effective_ttl(grant, args.ttl)
+    if args.json:
+        _jprint({"allowed": True, "ttl": ttl, "scopes": sorted(grant.scopes)})
+        return
     print(f"ALLOWED  ttl={ttl}s scopes={sorted(grant.scopes)}")
 
 
@@ -268,6 +331,10 @@ def cmd_policy_validate(args):
     from delcred.policy import validate
 
     errors, warnings = validate(_base(args))
+    if args.json:
+        _jprint({"ok": not errors, "errors": [_st(e, 600) for e in errors],
+                 "warnings": [_st(w, 600) for w in warnings]})
+        sys.exit(3 if errors else (1 if warnings and args.strict else 0))
     for e in errors:
         print(f"ERROR: {_st(e, 600)}", file=sys.stderr)
     for w in warnings:
@@ -291,6 +358,14 @@ def cmd_status(args):
     except (TrustConfigError, OSError, ValueError):
         # A broken trusted_issuers section must not break `status`.
         n_issuers = 0
+    if args.json:
+        _jprint({
+            "home": str(h), "issuer_key_present": priv.exists(),
+            "agents": len(pol.agents), "users": len(pol.users), "grants": len(pol.grants),
+            "trusted_issuers": n_issuers, "revocation_entries": len(rl._entries()),
+            "broker_records": len(Broker(h)._records()),
+        })
+        return
     print(f"home:      {h}")
     print(f"issuer key: {'present' if priv.exists() else 'MISSING — run delcred init'}")
     print(
@@ -299,6 +374,72 @@ def cmd_status(args):
     )
     print(f"revocation entries: {len(rl._entries())}")
     print(f"broker records:     {len(Broker(h)._records())}")
+
+
+def _doctor_policy(h: Path, add) -> None:
+    if not policy_path(h).exists():
+        add("FAIL", "policy.yaml", "missing; run `delcred init` (or create it) before minting anything")
+        return
+    try:
+        pol = load_policy(h)
+    except (PolicyError, OSError) as e:
+        add("FAIL", "policy.yaml", _st(e, 300))
+        return
+    note = "" if pol.grants else " (deny by default: nothing can be minted yet)"
+    add("ok" if pol.grants else "warn", "policy.yaml", f"{len(pol.grants)} grant(s){note}")
+
+
+def _doctor_audit(h: Path, add) -> None:
+    if not (h / "audit.jsonl").exists():
+        add("warn", "audit log", "no audit.jsonl yet (nothing recorded)")
+        return
+    try:
+        res = AuditLog(h).verify()
+    except (OSError, ValueError) as e:
+        add("FAIL", "audit log", _st(e, 300))
+        return
+    if res.ok:
+        add("ok", "audit log", f"{res.chained} chained entries")
+    else:
+        add("FAIL", "audit log", f"{len(res.problems)} problem(s); run `delcred audit verify`")
+
+
+def cmd_doctor(args):
+    """Check that a delcred home is healthy; read-only (creates nothing)."""
+    import stat as _stat
+
+    # Resolve the folder WITHOUT creating it (`_base` would mkdir ~/.delcred).
+    h = Path(args.home) if args.home else Path(os.environ.get("DELCRED_HOME", Path.home() / ".delcred"))
+    rows: list[tuple[str, str, str]] = []  # (level, check, detail)
+
+    def add(level: str, check: str, detail: str = "") -> None:
+        rows.append((level, check, detail))
+
+    if not h.is_dir():
+        add("FAIL", "home folder", f"{h} does not exist; run `delcred init`")
+    else:
+        add("ok", "home folder", str(h))
+        if os.name != "nt":
+            mode = _stat.S_IMODE(h.stat().st_mode)
+            add("ok" if not mode & 0o077 else "warn", "home permissions",
+                oct(mode) + ("" if not mode & 0o077 else " (others can list it; chmod 700)"))
+        try:
+            _keys.load_private(h)
+            _keys.load_public(h)
+            add("ok", "issuer key", "loads (Ed25519)")
+        except (OSError, HomeError, PermissionError) as e:
+            add("FAIL", "issuer key", _st(e, 300))
+        _doctor_policy(h, add)
+        _doctor_audit(h, add)
+    add("ok", "delcred", f"{delcred.__version__} on Python {sys.version_info.major}.{sys.version_info.minor}")
+    bad = any(level == "FAIL" for level, _, _ in rows)
+    if args.json:
+        _jprint({"ok": not bad, "checks": [{"level": a, "check": b, "detail": c} for a, b, c in rows]})
+    else:
+        for level, check, detail in rows:
+            print(f"[{level:>4}] {check}: {detail}")
+    if bad:
+        sys.exit(1)
 
 
 def cmd_trust_add(args):
@@ -332,6 +473,11 @@ def cmd_audit(args):
         except ValueError as e:
             print(f"CHECKPOINT UNUSABLE: {_st(e)} (after a hard key rotation, take a new checkpoint)", file=sys.stderr)
             sys.exit(6)
+        if args.json:
+            _jprint({"ok": res.ok, "chained": res.chained, "legacy": res.legacy, "head": res.head,
+                     "checkpoint_matched": bool(cp) and res.ok,
+                     "problems": [_st(x, 400) for x in res.problems]})
+            sys.exit(0 if res.ok else 6)
         if res.ok:
             print(
                 f"OK  {res.chained} hash-chained entries"
@@ -355,10 +501,10 @@ def cmd_audit(args):
         import time as _t
 
         since = int(_t.time()) - _parse_duration(args.since)
-    for e in log.tail(
+    for entry in log.tail(
         args.tail, event=args.event, agent=args.agent, user=args.user, since=since
     ):
-        print(json.dumps(e))
+        print(json.dumps(entry))
 
 
 def _parse_duration(text: str) -> int:
@@ -470,13 +616,28 @@ def cmd_sidecar(args):
     )
 
 
+def _port(text: str) -> int:
+    try:
+        n = int(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"{text!r} is not a port number") from None
+    if not 0 <= n <= 65535:
+        raise argparse.ArgumentTypeError("port must be between 0 and 65535")
+    return n
+
+
+def _version_text() -> str:
+    return f"delcred {delcred.__version__}"
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="delcred",
         description="Short-lived, per-task, per-user-scoped credentials for AI agents.",
     )
-    p.add_argument("--home", help="delcred home dir (default ~/.delcred)")
-    sub = p.add_subparsers(dest="cmd", required=True)
+    p.add_argument("--version", action="version", version=_version_text())
+    p.add_argument("--home", help="delcred home dir (default $DELCRED_HOME or ~/.delcred)")
+    sub = p.add_subparsers(dest="cmd")
 
     s = sub.add_parser("init", help="create issuer keypair + default policy")
     s.add_argument("--force", action="store_true")
@@ -601,13 +762,20 @@ def build_parser() -> argparse.ArgumentParser:
     c.add_argument("--scope", required=True)
     c.add_argument("--resource", required=True)
     c.add_argument("--ttl", type=int, default=900)
+    c.add_argument("--json", action="store_true", help="print the result as one JSON object on stdout")
     c.set_defaults(func=cmd_policy_check)
 
     c = ps.add_parser("validate", help="lint policy.yaml: types, typos, duplicate grants")
     c.add_argument("--strict", action="store_true", help="exit 1 on warnings too")
+    c.add_argument("--json", action="store_true", help="print the result as one JSON object on stdout")
     c.set_defaults(func=cmd_policy_validate)
 
+    s = sub.add_parser("doctor", help="check the home folder, key, policy and audit log (read-only)")
+    s.add_argument("--json", action="store_true", help="print the checks as one JSON object on stdout")
+    s.set_defaults(func=cmd_doctor)
+
     s = sub.add_parser("status", help="show home/policy/revocation state")
+    s.add_argument("--json", action="store_true", help="print the state as one JSON object on stdout")
     s.set_defaults(func=cmd_status)
 
     s = sub.add_parser(
@@ -617,6 +785,7 @@ def build_parser() -> argparse.ArgumentParser:
         "chain (exit 6 if tampered); audit head: print the newest hash to anchor.",
     )
     s.add_argument("action", nargs="?", default="show", choices=["show", "verify", "head", "checkpoint"])
+    s.add_argument("--json", action="store_true", help="with verify: print the result as one JSON object")
     s.add_argument("--checkpoint-file", help="with verify: a signed checkpoint from `audit checkpoint`")
     s.add_argument("--tail", type=int, default=20)
     s.add_argument("--event", help="only this event type, e.g. token_issued")
@@ -644,10 +813,11 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--require-scope", action="append")
     s.add_argument("--bulletin-file", help="signed revocation bulletin (delcred revocations export)")
     s.add_argument("--require-bulletin", action="store_true", help="fail closed if no fresh bulletin")
+    s.add_argument("--json", action="store_true", help="print the result as one JSON object on stdout")
     s.set_defaults(func=cmd_offline_verify)
 
     s = sub.add_parser("vectors", help="regenerate the cross-language test vectors")
-    s.add_argument("--out", default="spec/vectors")
+    s.add_argument("--out", default="spec/vectors", help="folder to write vectors.json into (default: ./spec/vectors)")
     s.set_defaults(func=cmd_vectors)
 
     s = sub.add_parser("prune", help="drop expired revocation + broker records")
@@ -676,7 +846,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.set_defaults(func=cmd_mcp_headers)
 
     s = sub.add_parser("serve", help="run the HTTP exchange API")
-    s.add_argument("--port", type=int, default=8400)
+    s.add_argument("--port", type=_port, default=8400)
     s.add_argument(
         "--rate-limit", type=int, default=60,
         help="max /token, /exchange, /revoke requests per minute per client IP (0 = off)",
@@ -692,7 +862,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.set_defaults(func=cmd_serve)
 
     s = sub.add_parser("sidecar", help="run the credential-injecting forward proxy")
-    s.add_argument("--port", type=int, default=8080)
+    s.add_argument("--port", type=_port, default=8080)
     s.add_argument(
         "--map",
         action="append",
@@ -732,13 +902,106 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
+_NOT_SET_UP_NAMES = {
+    "issuer.key", "issuer.pub", "policy.yaml", "audit.jsonl", "revocations.jsonl", "broker.jsonl",
+}
+
+
+def _fail(msg: str, code: int = 1) -> None:
+    print(f"delcred: {msg}", file=sys.stderr)
+    sys.exit(code)
+
+
+def _explain_oserror(e: OSError, args) -> str:
+    """Plain-English text for a file-system problem (no traceback for user errors)."""
+    name = Path(str(e.filename)).name if e.filename else ""
+    if isinstance(e, FileNotFoundError):
+        if e.filename is None:  # our own messages already say what to do
+            return _st(e, 400)
+        if name in _NOT_SET_UP_NAMES:
+            return (
+                f"no delcred home found at {_st(Path(str(e.filename)).parent, 300)} "
+                f"(missing {name}); run `delcred init` first"
+            )
+        return f"no such file or directory: {_st(e.filename, 300)}"
+    if isinstance(e, PermissionError):
+        if e.filename is None:
+            return _st(e, 400)
+        return f"permission denied: {_st(e.filename, 300)}"
+    if e.errno == 30:  # EROFS
+        return f"the file system is read-only: {_st(e.filename or '', 300)} (use --home or $DELCRED_HOME for a writable folder)"
+    if e.filename:
+        return f"{_st(e.strerror or e, 200)}: {_st(e.filename, 300)}"
+    return _st(e, 400)
+
+
+def _quiet_stdout() -> None:
+    """After EPIPE (``delcred ... | head``): stop Python flushing into a dead pipe."""
+    try:
+        os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
+    except (OSError, ValueError, AttributeError):
+        pass
+
+
 def main(argv=None):
-    args = build_parser().parse_args(argv)
+    # A cp1252 / ASCII console must never turn a hostile or accented string into
+    # a UnicodeEncodeError traceback: print an escape instead.
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(errors="backslashreplace")
+        except (AttributeError, ValueError):
+            pass
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if not getattr(args, "func", None):
+        parser.print_help(sys.stderr)
+        sys.exit(2)
+    debug = bool(os.environ.get("DELCRED_DEBUG"))
     try:
         args.func(args)
+        sys.stdout.flush()
+    except BrokenPipeError:
+        _quiet_stdout()
+        sys.exit(1)
+    except KeyboardInterrupt:
+        print("interrupted", file=sys.stderr)
+        sys.exit(130)
     except PolicyError as e:  # e.g. a malformed policy.yaml: say so, no traceback
         print(f"policy error: {_st(e, 600)}", file=sys.stderr)
         sys.exit(3)
+    except SystemExit:
+        raise
+    except Exception as e:
+        if debug:
+            raise
+        _report_unexpected(e, args)
+
+
+def _report_unexpected(e: Exception, args) -> None:
+    from delcred._jws import JWSError
+    from delcred.broker import BrokerError as _BE
+    from delcred.pop import PopError
+    from delcred.trust import TrustConfigError
+
+    if isinstance(e, HomeError):
+        _fail(_st(e, 600))
+    if isinstance(e, InsufficientScope):
+        _fail(f"INSUFFICIENT_SCOPE: missing {_st(' '.join(e.missing))}", 5)
+    if isinstance(e, (TokenError, JWSError, PopError, _BE)):
+        _fail(f"INVALID: {_st(e, 400)}", 4)
+    if isinstance(e, (ExchangeError, TrustConfigError)):
+        _fail(f"denied: {_st(e, 400)}", 3)
+    if isinstance(e, OSError):
+        _fail(_explain_oserror(e, args))
+    if isinstance(e, (ValueError, TypeError)):  # includes JSON/Unicode decode errors
+        _fail(f"invalid input: {_st(e, 400)}", 2)
+    if isinstance(e, OverflowError):
+        _fail(f"invalid number: {_st(e, 200)}", 2)
+    _fail(
+        f"internal error ({type(e).__name__}: {_st(e, 200)}). This is a bug in delcred; "
+        "rerun with DELCRED_DEBUG=1 for a traceback.",
+        70,
+    )
 
 
 if __name__ == "__main__":

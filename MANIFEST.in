@@ -1,0 +1,6 @@
+include LICENSE README.md CHANGELOG.md PUBLISH-CHECKLIST.md
+recursive-include spec *.md *.json *.mjs *.go go.mod
+recursive-include examples *.py
+recursive-include bench *.py *.json
+recursive-include docs *.md
+recursive-include tests *.py

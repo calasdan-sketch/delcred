@@ -225,7 +225,7 @@ def decode_unverified(token: str) -> dict[str, Any]:
 
 def _key_for_issuer(
     token: str, base: Path | None, allow_external: bool = False
-) -> tuple[bytes, list[str], str, str | None]:
+) -> tuple[bytes, list[str], Any, Any]:
     """Select the verification key and required claims from the token's ``iss``.
 
     Returns ``(public_key_pem, required_claims, issuer)``. The local issuer

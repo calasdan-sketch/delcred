@@ -83,7 +83,7 @@ def init(base: Path | None = None, force: bool = False) -> Path:
     if priv.exists() and not force:
         raise FileExistsError(f"issuer key already exists at {priv} (use force=True)")
     keys.generate(h)
-    policy.policy_path(h).write_text(policy.default_policy())
+    policy.policy_path(h).write_text(policy.default_policy(), encoding="utf-8")
     AuditLog(h).record("init", home=str(h))
     return h
 

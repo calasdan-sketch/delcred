@@ -16,9 +16,17 @@ server, database or cloud account required.
 ## Quick start (60 seconds)
 
 ```bash
-git clone <this repository> && cd delcred
-pip install .          # Python 3.10+; PyPI's `delcred` is the old 0.2.0, not this code
+pip install "delcred>=0.4"     # Python 3.10+; adds the `delcred` command
+delcred --version
 delcred demo
+```
+
+PyPI currently carries only the old 0.2.0 (checked with `pip index versions delcred`
+on the day of this commit). The `>=0.4` makes pip fail loudly instead of installing
+that old code; until 0.4.0 is published, install from a checkout:
+
+```bash
+git clone https://github.com/calasdan-sketch/delcred && cd delcred && pip install .
 ```
 
 `delcred demo` runs the whole tour in a throwaway directory (your real
@@ -66,7 +74,32 @@ delcred policy validate            # typos, duplicate grants, wrong types in pol
 
 Tokens are read from `--*-file`, `$DELCRED_SUBJECT_TOKEN` / `$DELCRED_ACTOR_TOKEN`,
 or `$…_FILE` (Docker-secrets style). Avoid passing them as CLI arguments —
-command lines are visible in `ps`.
+command lines are visible in `ps`. `verify`, `offline-verify` and `inspect`
+accept `-` as the token to read it from standard input
+(`delcred exchange ... | delcred verify - --resource ...`). Token files may be
+UTF-8, UTF-8 with BOM, or the UTF-16 that Windows PowerShell 5's `>` writes.
+
+### Scripting: exit codes, `--json`, stdout vs stderr
+
+Results go to stdout, diagnostics to stderr; user mistakes (missing home, bad
+file, bad port, damaged key) print one plain sentence, never a traceback
+(`DELCRED_DEBUG=1` restores tracebacks for bug reports).
+
+| Exit | Meaning |
+|---|---|
+| 0 | success |
+| 1 | something outside delcred's control or a missing prerequisite (no home yet, unreadable file, nothing revoked, `policy validate --strict` warnings) |
+| 2 | bad command line or invalid input value |
+| 3 | denied by policy / exchange refused / bad `policy.yaml` |
+| 4 | credential invalid, expired or revoked |
+| 5 | valid credential but missing a required scope |
+| 6 | audit log tampered or checkpoint unusable |
+| 70 | internal error in delcred (please report; rerun with `DELCRED_DEBUG=1`) |
+| 130 | interrupted (Ctrl-C) |
+
+`--json` on `verify`, `offline-verify`, `status`, `policy check`, `policy validate`
+and `audit verify` prints exactly one JSON object on stdout (also on failure,
+alongside the non-zero exit code).
 
 ## A real agent loop in one file
 
@@ -506,9 +539,13 @@ service.
 7. **Chained delegation is issuer-mediated.** Sub-agents get tokens by asking
    the issuer (which enforces attenuation); there is no offline, holder-side
    attenuation as in Biscuit/Macaroons, and no `may_act` claim.
-8. **Windows** is supported by design (portable locking, no POSIX-only
-   imports) but the test suite runs on Linux; on Windows the 0600 key-file
-   check is skipped and protection relies on your profile's NTFS ACLs.
+8. **Windows has never been run.** It is supported by design (portable
+   locking, no POSIX-only imports, UTF-8 everywhere, `\n`-exact key files,
+   retry on sharing violations when replacing a file) and a CI workflow for it
+   is included (`.github/workflows/ci.yml`), but every test so far ran on
+   Linux. On Windows the 0600 key-file check is skipped and protection relies on
+   your profile's NTFS ACLs; `msvcrt` locks are exclusive-only, so concurrent
+   readers serialize.
 9. **Scale.** Broker and audit files are JSONL. Revocation lookups
    are indexed in memory (one `stat` per check, only new bytes parsed after an
    append): 0.004 ms at 100,000 entries versus 173 ms in 0.3.0 (`bench/`).
@@ -543,3 +580,7 @@ Layout: `delcred/{tokens,keys,policy,exchange,revocation,broker,audit,mcp,pop,of
 ## License
 
 MIT — Calas Automations Inc. See [LICENSE](LICENSE).
+
+---
+
+Release notes: `CHANGELOG.md`. Review history and what was *not* done: `docs/ROUND4.md`. Release steps for the maintainer: `PUBLISH-CHECKLIST.md`.

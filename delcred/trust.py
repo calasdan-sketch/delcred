@@ -59,7 +59,7 @@ def trusted_issuer_configs(
     if not p.exists():
         return {}
     try:
-        data = yaml.safe_load(p.read_text()) or {}
+        data = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
     except yaml.YAMLError as e:
         raise TrustConfigError(f"cannot parse {p}: {e}") from e
     raw = data.get("trusted_issuers") or {}
@@ -156,7 +156,7 @@ def add_trusted_issuer(
 
 def _upsert_policy_mapping(home_: Path, iss: str, rel: str, audience: str | None = None) -> None:
     p = _policy_path(home_)
-    text = p.read_text() if p.exists() else ""
+    text = p.read_text(encoding="utf-8") if p.exists() else ""
     if audience is not None:
         data = yaml.safe_load(text) or {}
         section = data.get("trusted_issuers") or {}
@@ -164,14 +164,14 @@ def _upsert_policy_mapping(home_: Path, iss: str, rel: str, audience: str | None
             raise TrustConfigError("policy.yaml: 'trusted_issuers' must be a mapping")
         section[iss] = {"key": rel, "audience": audience}
         data["trusted_issuers"] = section
-        p.write_text(yaml.safe_dump(data, sort_keys=False))
+        p.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
         return
     if "trusted_issuers:" not in text:
         # Append a new section — leaves hand-edited content byte-identical.
         if text and not text.endswith("\n"):
             text += "\n"
         text += f'\ntrusted_issuers:\n  "{iss}": "{rel}"\n'
-        p.write_text(text)
+        p.write_text(text, encoding="utf-8")
         return
     data = yaml.safe_load(text) or {}
     section = data.get("trusted_issuers") or {}
@@ -179,4 +179,4 @@ def _upsert_policy_mapping(home_: Path, iss: str, rel: str, audience: str | None
         raise TrustConfigError("policy.yaml: 'trusted_issuers' must be a mapping")
     section[iss] = rel
     data["trusted_issuers"] = section
-    p.write_text(yaml.safe_dump(data, sort_keys=False))
+    p.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")

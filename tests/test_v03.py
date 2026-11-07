@@ -120,6 +120,10 @@ def test_delegate_user_agent_assertions(home, subject, actor):
 # --- JWKS / kid --------------------------------------------------------------
 
 
+@pytest.mark.skipif(
+    tuple(int(x) for x in jwt.__version__.split(".")[:2]) < (2, 9),
+    reason="PyJWT 2.8's PyJWK cannot use an Ed25519 (OKP) JWK for EdDSA; delcred itself works on 2.8",
+)
 def test_tokens_carry_kid_and_verify_with_stock_pyjwt(home, subject, actor):
     tok = _tok(home, subject, actor)
     jwks = delcred.jwks(base=home)

@@ -3,27 +3,27 @@
   "platform": "Linux x86_64",
   "delcred": {
     "version": "0.4.0",
-    "mint_per_s": 315.6879869748002,
-    "verify_full_per_s": 259.4925883311843,
-    "verify_signature_only_per_s": 1570.4508645270848,
+    "mint_per_s": 253.21089904378826,
+    "verify_full_per_s": 221.23612789744814,
+    "verify_signature_only_per_s": 2798.058376927767,
     "token_bytes": 541,
-    "verify_check_policy_per_s": 216.29203284813659,
-    "verify_full_audit_fsync_routine_off_per_s": 1008.6805721948291,
-    "verify_rejected_per_s": 1349.310780149853,
-    "audit_tail20_ms_at_100k": 0.9,
-    "audit_verify_s_at_100k": 1.75,
+    "verify_check_policy_per_s": 604.9181344529636,
+    "verify_full_audit_fsync_routine_off_per_s": 2549.609895024915,
+    "verify_rejected_per_s": 3142.9616328592792,
+    "audit_tail20_ms_at_100k": 3.05,
+    "audit_verify_s_at_100k": 1.15,
     "revocation_check_ms": {
-      "1000": 0.002,
+      "1000": 0.003,
       "10000": 0.003,
-      "100000": 0.003
+      "100000": 0.002
     },
-    "single_use_burn_per_s_at_100k": 469.3487716953526,
-    "attenuate_per_s": 136.6170014729801,
+    "single_use_burn_per_s_at_100k": 297.42345334019757,
+    "attenuate_per_s": 155.27767184175528,
     "chained_token_bytes": 604,
-    "offline_verify_per_s": 4127.214463110908,
-    "offline_verify_with_bulletin_per_s": 1876.6202610323076,
-    "dpop_make_proof_per_s": 10854.544258564487,
-    "dpop_verify_per_s": 3779.4129220220548,
+    "offline_verify_per_s": 3089.0969959073673,
+    "offline_verify_with_bulletin_per_s": 1563.5704716495597,
+    "dpop_make_proof_per_s": 9300.961901761273,
+    "dpop_verify_per_s": 5835.334266211854,
     "escalation_fuzz": {
       "attempts": 3000,
       "minted": 57,
@@ -33,33 +33,20 @@
   },
   "competitors": {
     "pyjwt_eddsa": {
-      "sign_per_s": 6516.150228385262,
-      "verify_per_s": 5050.600501752226,
+      "sign_per_s": 14794.274663064727,
+      "verify_per_s": 7708.382357573304,
       "note": "plain signed JWT: no agent identity, no delegation, no revocation, no audit"
     },
-    "pymacaroons": {
-      "mint_with_3_caveats_per_s": 70988.7895384299,
-      "attenuate_1_caveat_per_s": 32733.170649548963,
-      "verify_per_s": 41390.233798116205,
-      "token_bytes": 220,
-      "note": "HMAC: only the issuer (secret holder) can verify; no third-party/offline verification"
-    },
-    "biscuit_python": {
-      "mint_per_s": 13303.459528059075,
-      "attenuate_offline_per_s": 18119.783455895984,
-      "parse_and_authorize_per_s": 7635.037860624785,
-      "token_bytes_root": 288,
-      "token_bytes_attenuated": 460,
-      "note": "datalog policies, offline attenuation by the holder; no built-in agent/user identity model, revocation ids only, no audit log, no policy file"
-    }
+    "pymacaroons": "not installed",
+    "biscuit_python": "not installed"
   },
   "cross_language": {
     "cases": 89,
     "python": {
       "pass": 89,
-      "ms": 13.4
+      "ms": 14.7
     },
-    "node": "node: 89/89 vectors pass (19.2 ms)",
-    "go": "go: 89/89 vectors pass (7.5 ms)"
+    "node": "node: 89/89 vectors pass (22.4 ms)",
+    "go": "go: 89/89 vectors pass (8.0 ms)"
   }
 }

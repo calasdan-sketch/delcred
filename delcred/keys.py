@@ -15,7 +15,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
     Ed25519PublicKey,
 )
 
-from ._common import assert_private, home, write_private
+from ._common import HomeError, assert_private, home, write_private
 
 
 def key_paths(base: Path | None = None) -> tuple[Path, Path]:
@@ -56,7 +56,17 @@ def load_private(base: Path | None = None) -> Ed25519PrivateKey:
             f"no issuer key at {priv_path} — run `delcred init` first"
         )
     assert_private(priv_path)
-    return serialization.load_pem_private_key(priv_path.read_bytes(), password=None)
+    try:
+        key = serialization.load_pem_private_key(priv_path.read_bytes(), password=None)
+    except (ValueError, TypeError) as e:
+        raise HomeError(
+            f"issuer key {priv_path} is damaged or not an unencrypted Ed25519 PEM key; "
+            "restore it from a backup (or `delcred init --force` to start over, "
+            "which invalidates every token and key issued so far)"
+        ) from e
+    if not isinstance(key, Ed25519PrivateKey):
+        raise HomeError(f"issuer key {priv_path} is not an Ed25519 key")
+    return key
 
 
 def load_public(base: Path | None = None) -> Ed25519PublicKey:
@@ -65,7 +75,13 @@ def load_public(base: Path | None = None) -> Ed25519PublicKey:
         raise FileNotFoundError(
             f"no issuer public key at {pub_path} — run `delcred init` first"
         )
-    return serialization.load_pem_public_key(pub_path.read_bytes())
+    try:
+        key = serialization.load_pem_public_key(pub_path.read_bytes())
+    except (ValueError, TypeError) as e:
+        raise HomeError(f"issuer public key {pub_path} is damaged; re-create it with `delcred init --force` (invalidates all tokens)") from e
+    if not isinstance(key, Ed25519PublicKey):
+        raise HomeError(f"issuer public key {pub_path} is not an Ed25519 key")
+    return key
 
 
 def _b64url(raw: bytes) -> str:
@@ -122,11 +138,11 @@ def retired_keys(base: Path | None = None, *, now: int | None = None) -> dict[st
         return out
     for f in sorted(d.glob("*.json")):
         try:
-            rec = json.loads(f.read_text())
+            rec = json.loads(f.read_text(encoding="utf-8"))
             if int(rec["retire_after"]) < t:
                 continue
             pub = serialization.load_pem_public_key(rec["pem"].encode())
-            if key_id(pub) == rec["kid"] == f.stem:
+            if isinstance(pub, Ed25519PublicKey) and key_id(pub) == rec["kid"] == f.stem:
                 out[rec["kid"]] = pub
         except (OSError, KeyError, ValueError, TypeError):
             continue  # a damaged record never widens trust

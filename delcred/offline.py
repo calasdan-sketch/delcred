@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, TypeGuard
 
 from . import pop as _pop
 from ._common import CLOCK_SKEW_LEEWAY, ISSUER_ID, MAX_CHAIN_DEPTH, parse_scope
@@ -82,7 +82,7 @@ def _verify_jws(token: str, jwks: Any, typ: set[str]) -> tuple[dict, dict]:
     return header, payload
 
 
-def _int(v: Any) -> bool:
+def _int(v: Any) -> TypeGuard[int]:
     return isinstance(v, int) and not isinstance(v, bool)
 
 

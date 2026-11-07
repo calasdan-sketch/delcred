@@ -21,12 +21,15 @@ fcntl/msvcrt locks are per-process; callers additionally hold a
 from __future__ import annotations
 
 import os
+import sys
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
-if os.name == "nt":  # pragma: no cover - exercised on Windows CI only
+from delcred._common import replace_file
+
+if sys.platform == "win32":  # pragma: no cover - exercised on Windows CI only
     import msvcrt
 
     def _acquire(fd: int, shared: bool) -> None:
@@ -78,4 +81,4 @@ def atomic_rewrite(path: Path, lines: list[str]) -> None:
         tf.writelines(line + "\n" for line in lines)
         tf.flush()
         os.fsync(tf.fileno())
-    os.replace(tmp, path)
+    replace_file(tmp, path)

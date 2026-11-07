@@ -20,6 +20,12 @@ MAX_CHAIN_DEPTH = 4  # hard cap on agent -> sub-agent hops
 MAX_ID_CHARS = 256
 
 
+class HomeError(Exception):
+    """The delcred home directory is unusable (damaged key, wrong file type...).
+
+    Reported by the CLI as a plain-English error, exit code 1."""
+
+
 def home() -> Path:
     """State directory: $DELCRED_HOME or ~/.delcred (created 0700)."""
     p = Path(os.environ.get("DELCRED_HOME", Path.home() / ".delcred"))
@@ -58,7 +64,11 @@ def write_private(path: Path, data: bytes) -> None:
     world-readable ``path`` is replaced, not written into.
     """
     tmp = path.with_name(f".{path.name}.{os.getpid()}.{secrets.token_hex(4)}.tmp")
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
+    # O_BINARY: on Windows a plain os.write() would turn every \n into \r\n.
+    flags = (
+        os.O_WRONLY | os.O_CREAT | os.O_EXCL
+        | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0)
+    )
     fd = os.open(tmp, flags, 0o600)
     try:
         try:
@@ -74,13 +84,33 @@ def write_private(path: Path, data: bytes) -> None:
         tmp.unlink(missing_ok=True)
         raise
     os.close(fd)
-    os.replace(tmp, path)
+    replace_file(tmp, path)
+
+
+def replace_file(src, dst, *, attempts: int = 8) -> None:
+    """``os.replace`` that survives Windows' sharing violations.
+
+    On POSIX this is exactly ``os.replace``. On Windows a rename onto a file
+    another process (a virus scanner, a concurrent reader) has open fails with
+    ``PermissionError``; retry briefly with a growing pause, then give up with
+    the original error. (Not exercised on a real Windows machine.)
+    """
+    import time
+
+    for i in range(attempts):
+        try:
+            os.replace(src, dst)
+            return
+        except PermissionError:
+            if os.name != "nt" or i == attempts - 1:
+                raise
+            time.sleep(0.01 * (2 ** i))
 
 
 def load_json(path: Path, default):
     try:
-        return json.loads(path.read_text())
-    except (FileNotFoundError, json.JSONDecodeError):
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError, UnicodeDecodeError):
         return default
 
 

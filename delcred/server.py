@@ -243,7 +243,7 @@ class _Handler(BaseHTTPRequestHandler):
     def _base_url(self) -> str:
         if self.public_url:
             return self.public_url.rstrip("/")
-        host, port = self.server.server_address[:2]
+        host, port = self.server.server_address[:2]  # type: ignore[index,str-unpack]
         if ":" in str(host):
             host = f"[{host}]"
         return f"http://{host}:{port}"

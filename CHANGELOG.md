@@ -104,13 +104,46 @@
   only the old 0.2.0, checked with `pip index`); sample demo output, the
   chained-delegation row of the comparison and the benchmark table were stale.
 
+### Round 4 (what a stranger gets from `pip install`)
+
+Registry check: PyPI has only 0.2.0 (same author). 0.3.0 was never uploaded, so the
+next upload is **0.4.0**, which contains everything listed under 0.3.0 and 0.4.0
+and is breaking relative to 0.2.0 (see the "Breaking (security)" list below).
+
+#### Added
+- `delcred --version`; `delcred` with no command prints the help (exit 2).
+- `delcred doctor [--json]`: read-only health check of home, key, policy and audit log.
+- `--json` on `status`, `policy check`, `policy validate`, `audit verify`,
+  `offline-verify`, and on the failure paths of `verify`: one JSON object on stdout.
+- `verify -`, `offline-verify -`, `inspect -` read the token from stdin (keeps it out of `ps`).
+- Token files written by Windows tools (UTF-8 BOM, UTF-16 from PowerShell 5, CRLF) are read correctly.
+- Documented exit codes (README "Scripting"), `DELCRED_DEBUG=1` for tracebacks.
+- `py.typed` (mypy is clean on `delcred/`), `MANIFEST.in` (sdist now carries CHANGELOG, spec, examples, bench),
+  SPDX `license = "MIT"`, Python 3.10-3.13 / OS / typing classifiers, project URLs, `.github/workflows/ci.yml`
+  (tests on Linux, Windows, macOS; build + `twine check`; never publishes).
+
+#### Fixed
+- Every user mistake that used to print a traceback now prints one plain sentence: no home yet
+  (`status`, `audit`, `revoke`, `policy`, `jwks`, `agent-token`...), unreadable or non-UTF-8 files,
+  `inspect`/`verify` on garbage, `--port 99999`, damaged or world-readable issuer key, read-only
+  file system, `init` twice, hostile ids. Unexpected exceptions exit 70 with a one-line bug notice.
+- `delcred ... | head` no longer ends in `BrokenPipeError`.
+- Windows (static fixes, **not run on Windows**): every text read/write is UTF-8 (cp1252 would corrupt or
+  reject non-ASCII policy/trust files); key files are opened `O_BINARY` (no `\r\n` injected into PEM);
+  `os.replace` retries on sharing violations; console output uses `backslashreplace` instead of raising
+  `UnicodeEncodeError`.
+- Token/JWKS/bulletin/checkpoint files larger than 1 MiB are refused instead of read into memory.
+- 21 mypy errors (none were runtime bugs).
+- Test suite passes on the declared minimum dependencies (PyJWT 2.8, cryptography 41, PyYAML 6.0.1);
+  the one test that uses PyJWT's `PyJWK` with an Ed25519 JWK is skipped on PyJWT < 2.9 (a PyJWT limitation).
+
 ### Compatibility
 - All 0.3 APIs and tokens keep working. A delegation token used as
   `subject_token` previously always failed; it now works only for agents the
   grant lists in `delegate_to`, otherwise it still fails.
 - `key rotate` without flags is still a hard cut.
 
-## 0.3.0 — unreleased
+## 0.3.0 — never published (folded into 0.4.0)
 
 ### Added
 - **Least-privilege verification:** `verify(..., required_scopes=...)`,

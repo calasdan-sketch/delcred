@@ -308,7 +308,7 @@ def load(base: Path | None = None) -> Policy:
     string where a list belongs used to become a set of single characters."""
     p = policy_path(base)
     if not p.exists():
-        p.write_text(default_policy())
+        p.write_text(default_policy(), encoding="utf-8")
     try:
         data = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
     except (yaml.YAMLError, UnicodeDecodeError) as e:
