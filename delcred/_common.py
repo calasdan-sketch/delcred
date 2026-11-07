@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import secrets
 import stat
+import unicodedata
 from pathlib import Path
 
 DEFAULT_TTL = 900  # 15 minutes — the primary blast-radius control
@@ -13,6 +15,9 @@ MAX_TTL = 3600  # hard cap: 60 minutes, enforced server-side
 CLOCK_SKEW_LEEWAY = 60  # seconds of acceptable clock skew
 ISSUER_ID = "delcred"
 KEY_PREFIX = "dk_"  # opaque broker keys look like: dk_<urlsafe>
+MAX_TOKEN_BYTES = 16 * 1024  # any JWT larger than this is junk or an attack
+MAX_CHAIN_DEPTH = 4  # hard cap on agent -> sub-agent hops
+MAX_ID_CHARS = 256
 
 
 def home() -> Path:
@@ -77,3 +82,56 @@ def load_json(path: Path, default):
         return json.loads(path.read_text())
     except (FileNotFoundError, json.JSONDecodeError):
         return default
+
+
+# RFC 6749 §3.3: scope-token = 1*( %x21 / %x23-5B / %x5D-7E ), separated by
+# a single ASCII space. Python's str.split() also splits on NBSP, tabs and
+# other Unicode spaces, which other languages' verifiers would NOT — a
+# cross-language disagreement about what a scope string means. Be strict.
+_SCOPE_TOKEN = re.compile(r"[\x21\x23-\x5b\x5d-\x7e]+\Z")
+
+
+def parse_scope(scope: object) -> list[str]:
+    """Strictly parse an RFC 6749 scope string into a sorted, de-duplicated list.
+
+    Raises ``ValueError`` for non-strings, empty strings, and any scope
+    containing characters outside the RFC 6749 scope-token alphabet
+    (including every non-ASCII-space whitespace character).
+    """
+    if not isinstance(scope, str):
+        raise TypeError("scope must be a string")
+    parts = [p for p in scope.split(" ") if p]
+    if not parts:
+        raise ValueError("scope must not be empty")
+    for p in parts:
+        if not _SCOPE_TOKEN.match(p):
+            raise ValueError(f"invalid scope token {p[:40]!r} (RFC 6749 §3.3)")
+    return sorted(set(parts))
+
+
+def check_identifier(value: object, what: str = "identifier") -> str:
+    """Validate a user/agent id: 1..256 chars, no control, format, separator,
+    private-use or unassigned code points (terminal escapes, bidi overrides,
+    zero-width characters, line breaks) and no whitespace at all."""
+    if not isinstance(value, str):
+        raise TypeError(f"{what} must be a string")
+    if not value:
+        raise ValueError(f"{what} must not be empty")
+    if len(value) > MAX_ID_CHARS:
+        raise ValueError(f"{what} longer than {MAX_ID_CHARS} characters")
+    for ch in value:
+        if unicodedata.category(ch)[0] in ("C", "Z"):
+            raise ValueError(
+                f"{what} contains a forbidden character (U+{ord(ch):04X}): "
+                "control, format, whitespace and separator characters are not allowed"
+            )
+    return value
+
+
+def check_ttl(ttl: object) -> int:
+    """TTL must be a positive int (bool and float are rejected)."""
+    if isinstance(ttl, bool) or not isinstance(ttl, int):
+        raise ValueError("ttl must be an integer number of seconds")  # noqa: TRY004 - callers map ValueError to a policy denial
+    if ttl <= 0:
+        raise ValueError("ttl must be positive")
+    return ttl

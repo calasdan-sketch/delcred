@@ -1,0 +1,60 @@
+{
+  "python": "3.13.18",
+  "platform": "Linux x86_64",
+  "delcred": {
+    "version": "0.4.0",
+    "mint_per_s": 500.84322716959315,
+    "verify_full_per_s": 1228.7036727777902,
+    "verify_signature_only_per_s": 3472.554164639422,
+    "token_bytes": 541,
+    "revocation_check_ms": {
+      "1000": 0.005,
+      "10000": 0.003,
+      "100000": 0.003
+    },
+    "single_use_burn_per_s_at_100k": 4607.812773904293,
+    "attenuate_per_s": 364.29802820913716,
+    "chained_token_bytes": 604,
+    "offline_verify_per_s": 7237.0950449125985,
+    "offline_verify_with_bulletin_per_s": 4327.277164695988,
+    "dpop_make_proof_per_s": 19523.419278520738,
+    "dpop_verify_per_s": 6765.916100432327,
+    "escalation_fuzz": {
+      "attempts": 3000,
+      "minted": 57,
+      "refused": 2943,
+      "invariant_violations": 0
+    }
+  },
+  "competitors": {
+    "pyjwt_eddsa": {
+      "sign_per_s": 12550.773631764896,
+      "verify_per_s": 7007.706776904588,
+      "note": "plain signed JWT: no agent identity, no delegation, no revocation, no audit"
+    },
+    "pymacaroons": {
+      "mint_with_3_caveats_per_s": 70559.4055500203,
+      "attenuate_1_caveat_per_s": 46253.89154268553,
+      "verify_per_s": 87751.37753253213,
+      "token_bytes": 220,
+      "note": "HMAC: only the issuer (secret holder) can verify; no third-party/offline verification"
+    },
+    "biscuit_python": {
+      "mint_per_s": 17086.722377838603,
+      "attenuate_offline_per_s": 22467.810368005088,
+      "parse_and_authorize_per_s": 8214.829370946687,
+      "token_bytes_root": 288,
+      "token_bytes_attenuated": 460,
+      "note": "datalog policies, offline attenuation by the holder; no built-in agent/user identity model, revocation ids only, no audit log, no policy file"
+    }
+  },
+  "cross_language": {
+    "cases": 89,
+    "python": {
+      "pass": 89,
+      "ms": 12.0
+    },
+    "node": "node: 89/89 vectors pass (22.5 ms)",
+    "go": "go: 89/89 vectors pass (7.4 ms)"
+  }
+}

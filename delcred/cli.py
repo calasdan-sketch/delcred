@@ -33,9 +33,63 @@ def cmd_init(args):
 
 def cmd_key_rotate(args):
     h = _base(args)
-    _keys.generate(h)
+    _, _, old = _keys.rotate(h, keep_old=args.keep_old or 0)
     print("issuer key rotated.")
-    print("WARNING: tokens minted with the previous key no longer verify.")
+    if old:
+        print(
+            f"old key {old} stays valid for verification for {args.keep_old}s "
+            "(it never signs again; it is published in the JWKS until then)."
+        )
+        print("If the old key may be compromised, run `delcred key rotate` (hard cut) instead.")
+    else:
+        print("WARNING: tokens minted with the previous key no longer verify.")
+
+
+def cmd_key_retire(args):
+    if _keys.retire(args.kid, _base(args)):
+        print(f"retired key {args.kid} removed; tokens it signed no longer verify.")
+    else:
+        sys.exit(f"no retired key {args.kid!r}")
+
+
+def cmd_revocations_export(args):
+    from delcred import bulletin
+
+    print(bulletin.export(_base(args), ttl=args.ttl))
+
+
+def cmd_offline_verify(args):
+    """Verify with only a JWKS file (no delcred home) — what a third-party
+    resource server sees."""
+    from delcred.offline import verify_offline
+
+    jwks = json.loads(Path(args.jwks_file).expanduser().read_text())
+    bulletin = (
+        Path(args.bulletin_file).expanduser().read_text().strip() if args.bulletin_file else None
+    )
+    v = verify_offline(
+        args.token,
+        jwks=jwks,
+        resource=args.resource,
+        required_scopes=args.require_scope or None,
+        bulletin=bulletin,
+        require_bulletin=args.require_bulletin,
+    )
+    if v.ok:
+        c = v.claims
+        print(f"VALID  sub={c['sub']} act={c['act']['sub']} scope={c['scope']!r} aud={c['aud']}")
+        return
+    print(f"INVALID: {v.code}: {v.detail}", file=sys.stderr)
+    sys.exit(5 if v.code == "insufficient_scope" else 4)
+
+
+def cmd_vectors(args):
+    from delcred import vectors
+
+    out = Path(args.out)
+    out.mkdir(parents=True, exist_ok=True)
+    vectors.write(out / "vectors.json")
+    print(f"wrote {out / 'vectors.json'}")
 
 
 def cmd_agent_token(args):
@@ -82,6 +136,15 @@ def _read_secret(args, name: str, env: str) -> str:
     )
 
 
+def _chain(c) -> list[str]:
+    from delcred.tokens import actor_chain
+
+    try:
+        return list(reversed(actor_chain(c)))  # root first
+    except TokenError:
+        return [str(c.get("act", {}).get("sub"))]
+
+
 def cmd_exchange(args):
     subject_token = _read_secret(args, "subject_token", "DELCRED_SUBJECT_TOKEN")
     actor_token = _read_secret(args, "actor_token", "DELCRED_ACTOR_TOKEN")
@@ -100,6 +163,7 @@ def cmd_exchange(args):
             resource=args.resource,
             requested_token_type=result_type,
             ttl=args.ttl,
+            dpop_jkt=args.dpop_jkt,
             base=_base(args),
         )
     except (ExchangeError, PolicyError) as e:
@@ -111,7 +175,7 @@ def cmd_exchange(args):
         c = result.claims
         print(result.credential)
         print(
-            f"# sub={c['sub']} act={c['act']['sub']} scope={c['scope']!r} "
+            f"# sub={c['sub']} act={'>'.join(_chain(c))} scope={c['scope']!r} "
             f"resource={c['aud']} ttl={result.ttl}s jti={c['jti']}",
             file=sys.stderr,
         )
@@ -379,8 +443,24 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser("key", help="issuer key operations")
     ks = s.add_subparsers(dest="keycmd", required=True)
-    r = ks.add_parser("rotate", help="rotate the issuer key (invalidates old tokens)")
+    r = ks.add_parser(
+        "rotate",
+        help="rotate the issuer key (hard cut by default: old tokens stop verifying)",
+    )
+    r.add_argument(
+        "--keep-old",
+        nargs="?",
+        type=int,
+        const=86460,
+        default=0,
+        metavar="SECONDS",
+        help="overlap window: keep the old key verifying (never signing) for this long "
+        "(default 86460 = 24h+60s, longer than an agent token). Omit after a compromise.",
+    )
     r.set_defaults(func=cmd_key_rotate)
+    r = ks.add_parser("retire", help="stop trusting one retired key right now")
+    r.add_argument("kid")
+    r.set_defaults(func=cmd_key_retire)
 
     s = sub.add_parser("agent-token", help="mint an agent identity token")
     s.add_argument("agent_id")
@@ -413,6 +493,10 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--ttl", type=int, default=900)
     s.add_argument(
         "--as-api-key", action="store_true", help="issue opaque dk_… key instead of JWT"
+    )
+    s.add_argument(
+        "--dpop-jkt",
+        help="bind the token to a DPoP key (RFC 7638 thumbprint, see delcred.pop.thumbprint)",
     )
     s.add_argument(
         "--quiet-claims",
@@ -488,6 +572,28 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser("jwks", help="print the issuer's public JWK Set")
     s.set_defaults(func=cmd_jwks)
+
+    s = sub.add_parser("revocations", help="signed revocation bulletin for third-party verifiers")
+    rs = s.add_subparsers(dest="revcmd", required=True)
+    r = rs.add_parser("export", help="print the signed bulletin (compact JWS)")
+    r.add_argument("--ttl", type=int, default=300, help="seconds the bulletin stays fresh")
+    r.set_defaults(func=cmd_revocations_export)
+
+    s = sub.add_parser(
+        "offline-verify",
+        help="verify a token with only a JWKS file (no delcred home) — the third-party view",
+    )
+    s.add_argument("token")
+    s.add_argument("--jwks-file", required=True)
+    s.add_argument("--resource", required=True)
+    s.add_argument("--require-scope", action="append")
+    s.add_argument("--bulletin-file", help="signed revocation bulletin (delcred revocations export)")
+    s.add_argument("--require-bulletin", action="store_true", help="fail closed if no fresh bulletin")
+    s.set_defaults(func=cmd_offline_verify)
+
+    s = sub.add_parser("vectors", help="regenerate the cross-language test vectors")
+    s.add_argument("--out", default="spec/vectors")
+    s.set_defaults(func=cmd_vectors)
 
     s = sub.add_parser("prune", help="drop expired revocation + broker records")
     s.set_defaults(func=cmd_prune)

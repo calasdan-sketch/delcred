@@ -45,7 +45,7 @@ from ._common import KEY_PREFIX, home
 from .broker import Broker, BrokerError, BrokerScopeError
 from .exchange import ExchangeError
 from .exchange import verify as _verify
-from .tokens import InsufficientScope, TokenError, normalize_scopes
+from .tokens import InsufficientScope, InvalidToken, TokenError, normalize_scopes
 
 # Bearer tokens are short; anything bigger is junk or an attack.
 MAX_AUTHORIZATION_HEADER = 16 * 1024
@@ -142,7 +142,18 @@ class AuthDecision:
 
     @property
     def agent(self) -> str | None:
+        """The acting agent (leaf of the delegation chain)."""
         return (self.claims.get("act") or {}).get("sub")
+
+    @property
+    def agents(self) -> list[str]:
+        """Whole chain, acting agent first, the user's original delegatee last."""
+        try:
+            from .tokens import actor_chain
+
+            return actor_chain(self.claims)
+        except TokenError:
+            return []
 
 
 def bearer_token(authorization: str | None) -> str | None:
@@ -158,6 +169,20 @@ def bearer_token(authorization: str | None) -> str | None:
     return token
 
 
+def credentials(authorization: str | None) -> tuple[str, str] | None:
+    """``(scheme, token)`` for an ``Authorization`` header using the ``Bearer``
+    or ``DPoP`` scheme (case-insensitive), else ``None``."""
+    if not authorization or len(authorization) > MAX_AUTHORIZATION_HEADER:
+        return None
+    scheme, _, rest = authorization.strip().partition(" ")
+    if scheme.lower() not in ("bearer", "dpop"):
+        return None
+    token = rest.strip()
+    if not token or any(c.isspace() for c in token):
+        return None
+    return scheme.lower(), token
+
+
 def authorize(
     authorization: str | None,
     *,
@@ -165,12 +190,21 @@ def authorize(
     required_scopes: str | list[str] | None = None,
     resource_metadata_url: str | None = None,
     base: Path | None = None,
+    dpop_proof: str | None = None,
+    http_method: str | None = None,
+    http_url: str | None = None,
 ) -> AuthDecision:
     """Authorize one request. Never raises for bad credentials — returns a decision.
 
     Every challenge carries ``resource_metadata`` (the MCP spec relies on it
     for discovery): pass ``resource_metadata_url`` or it is derived from
     ``resource`` as ``<origin>/.well-known/oauth-protected-resource<path>``.
+
+    **DPoP (RFC 9449).** A sender-constrained token must arrive as
+    ``Authorization: DPoP <token>`` plus a ``DPoP: <proof>`` header; pass the
+    proof, the request method and the full request URL as ``dpop_proof`` /
+    ``http_method`` / ``http_url``. A bound token sent as plain ``Bearer``,
+    or with a bad proof, is refused (401, ``DPoP`` challenge).
 
     Error descriptions are deliberately generic (no oracle about *why* a
     token failed); the delcred audit log records the specific reason.
@@ -195,7 +229,9 @@ def authorize(
             ),
         )
 
-    token = bearer_token(authorization)
+    creds = credentials(authorization)
+    token = creds[1] if creds else None
+    scheme = creds[0] if creds else "bearer"
     if token is None:
         # RFC 6750 §3.1: no error code when the request lacked credentials.
         return AuthDecision(
@@ -226,9 +262,31 @@ def authorize(
         }
         return AuthDecision(ok=True, status=200, claims=claims)
     try:
-        claims = _verify(token, expected_resource=resource, required_scopes=need or None, base=home_)
+        claims = _verify(
+            token,
+            expected_resource=resource,
+            required_scopes=need or None,
+            base=home_,
+            dpop_proof=dpop_proof if scheme == "dpop" else None,
+            http_method=http_method,
+            http_url=http_url,
+        )
     except InsufficientScope as e:
         return deny(403, "insufficient_scope", "additional scope required", scope=e.required)
+    except InvalidToken as e:
+        if "DPoP" in str(e) or "sender-constrained" in str(e):
+            return AuthDecision(
+                ok=False,
+                status=401,
+                error="invalid_dpop_proof",
+                description="a valid DPoP proof is required",
+                www_authenticate='DPoP error="invalid_dpop_proof", algs="EdDSA", '
+                f"resource_metadata={_quote(resource_metadata_url)}",
+            )
+        return deny(401, "invalid_token", "invalid or expired credential")
     except (TokenError, ExchangeError):
+        return deny(401, "invalid_token", "invalid or expired credential")
+    if scheme == "dpop" and not claims.get("cnf"):
+        # DPoP scheme on an unbound token is a client bug; refuse rather than guess.
         return deny(401, "invalid_token", "invalid or expired credential")
     return AuthDecision(ok=True, status=200, claims=claims)

@@ -1,0 +1,1610 @@
+{
+ "bulletin_max_age_seconds": 300,
+ "cases": [
+  {
+   "expect": [
+    "ok"
+   ],
+   "name": "valid_basic",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.hlwhZ-7wmh2BE4cffBQZauuqd4IS1GAeLPvN1t5MPYTI1EG_iqyQ_lLpvybbna7h6pQv09Rh6GHmuHQdk9oeCw",
+   "why": "well-formed token, right audience"
+  },
+  {
+   "expect": [
+    "ok"
+   ],
+   "name": "valid_required_scope",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": [
+     "invoices:read"
+    ],
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.hlwhZ-7wmh2BE4cffBQZauuqd4IS1GAeLPvN1t5MPYTI1EG_iqyQ_lLpvybbna7h6pQv09Rh6GHmuHQdk9oeCw",
+   "why": "token holds the required scope"
+  },
+  {
+   "expect": [
+    "ok"
+   ],
+   "name": "valid_two_scopes",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": [
+     "invoices:read",
+     "customers:read"
+    ],
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.hlwhZ-7wmh2BE4cffBQZauuqd4IS1GAeLPvN1t5MPYTI1EG_iqyQ_lLpvybbna7h6pQv09Rh6GHmuHQdk9oeCw",
+   "why": "all required scopes held"
+  },
+  {
+   "expect": [
+    "ok"
+   ],
+   "name": "valid_chained_depth2",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsiYWN0Ijp7InN1YiI6ImJpbGxpbmctYWdlbnQifSwic3ViIjoic3VtbWFyaXplciJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJjaGFpbiI6WyJqdGktcGFyZW50Il0sImV4cCI6MTgwMDAwMDg0MCwiaWF0IjoxNzk5OTk5OTQwLCJpc3MiOiJkZWxjcmVkIiwianRpIjoianRpLTAwMDIiLCJraW5kIjoiZGVsZWdhdGlvbiIsIm5iZiI6MTc5OTk5OTk0MCwic2NvcGUiOiJjdXN0b21lcnM6cmVhZCBpbnZvaWNlczpyZWFkIiwic3ViIjoidV9hbGljZSIsInVzZXJfaXNzIjoiZGVsY3JlZCJ9.psh1dlqs18E5gbHBwjQyO78czESzg1-tACk3KM4FvIsjNaJIHTr_Xj1tPZjNliHR-ALji9VJu8B_AaLgT4YECQ",
+   "why": "RFC 8693 nested act with matching chain"
+  },
+  {
+   "expect": [
+    "ok"
+   ],
+   "name": "valid_chained_depth3",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsiYWN0Ijp7ImFjdCI6eyJzdWIiOiJhIn0sInN1YiI6ImIifSwic3ViIjoiYyJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJjaGFpbiI6WyJqMSIsImoyIl0sImV4cCI6MTgwMDAwMDg0MCwiaWF0IjoxNzk5OTk5OTQwLCJpc3MiOiJkZWxjcmVkIiwianRpIjoianRpLTAwMDEiLCJraW5kIjoiZGVsZWdhdGlvbiIsIm5iZiI6MTc5OTk5OTk0MCwic2NvcGUiOiJjdXN0b21lcnM6cmVhZCBpbnZvaWNlczpyZWFkIiwic3ViIjoidV9hbGljZSIsInVzZXJfaXNzIjoiZGVsY3JlZCJ9.bzI9hSz69hkrUHE57FAQ7DY4HwfG651ZVOi_Cwa1oqCgk2AGrwnSSNIfD7Lp3qDGWuOwa65u7RwBH6Rv4oEoAg",
+   "why": "three actors, two ancestor jtis"
+  },
+  {
+   "expect": [
+    "ok"
+   ],
+   "name": "leeway_expired_boundary_ok",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000900,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.hlwhZ-7wmh2BE4cffBQZauuqd4IS1GAeLPvN1t5MPYTI1EG_iqyQ_lLpvybbna7h6pQv09Rh6GHmuHQdk9oeCw",
+   "why": "exp + 60s leeway is still valid"
+  },
+  {
+   "expect": [
+    "expired"
+   ],
+   "name": "expired",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000901,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.hlwhZ-7wmh2BE4cffBQZauuqd4IS1GAeLPvN1t5MPYTI1EG_iqyQ_lLpvybbna7h6pQv09Rh6GHmuHQdk9oeCw",
+   "why": "one second past exp + leeway"
+  },
+  {
+   "expect": [
+    "ok"
+   ],
+   "name": "leeway_nbf_boundary_ok",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE4MDAwMDAwNjAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.ytUM15mcBFK5RkIfWqYMb6FPFxDi_dKIP7q5GcYd-nSOlxydcmy7oO-d-bXmvIm10cS1-rURqbi_zNcm0j8wBQ",
+   "why": "nbf = now + 60s is within leeway"
+  },
+  {
+   "expect": [
+    "not_yet_valid"
+   ],
+   "name": "not_yet_valid",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE4MDAwMDAwNjEsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.xTWxPEyY4wB2EUlp_Ja6nIvT0jHXJtt55mNkyhvz-IkbGEfdTCAWJxCxanlN-ACiu4tGKP8PbNH6DqexprlJAw",
+   "why": "nbf one second beyond leeway"
+  },
+  {
+   "expect": [
+    "wrong_audience"
+   ],
+   "name": "wrong_audience",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://other.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.hlwhZ-7wmh2BE4cffBQZauuqd4IS1GAeLPvN1t5MPYTI1EG_iqyQ_lLpvybbna7h6pQv09Rh6GHmuHQdk9oeCw",
+   "why": "confused-deputy: token for API A at API B"
+  },
+  {
+   "expect": [
+    "wrong_audience"
+   ],
+   "name": "audience_prefix_not_equal",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1/"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.hlwhZ-7wmh2BE4cffBQZauuqd4IS1GAeLPvN1t5MPYTI1EG_iqyQ_lLpvybbna7h6pQv09Rh6GHmuHQdk9oeCw",
+   "why": "audience compare is exact string equality"
+  },
+  {
+   "expect": [
+    "invalid_token"
+   ],
+   "name": "audience_array_rejected",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOlsiaHR0cHM6Ly9hcGkuYWNtZS50ZXN0L3YxIl0sImV4cCI6MTgwMDAwMDg0MCwiaWF0IjoxNzk5OTk5OTQwLCJpc3MiOiJkZWxjcmVkIiwianRpIjoianRpLTAwMDEiLCJraW5kIjoiZGVsZWdhdGlvbiIsIm5iZiI6MTc5OTk5OTk0MCwic2NvcGUiOiJjdXN0b21lcnM6cmVhZCBpbnZvaWNlczpyZWFkIiwic3ViIjoidV9hbGljZSIsInVzZXJfaXNzIjoiZGVsY3JlZCJ9.GB-eXIVoWeP5tnSNiVfoJTAWWBJh-wDIuPLLvAFfXfziFPWVwyMCaRlTEBE4FXtfuqgZvWwEVSWUPwUSNXbHBQ",
+   "why": "aud must be a single string"
+  },
+  {
+   "expect": [
+    "insufficient_scope"
+   ],
+   "name": "insufficient_scope",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": [
+     "invoices:write"
+    ],
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.hlwhZ-7wmh2BE4cffBQZauuqd4IS1GAeLPvN1t5MPYTI1EG_iqyQ_lLpvybbna7h6pQv09Rh6GHmuHQdk9oeCw",
+   "why": "step-up needed"
+  },
+  {
+   "expect": [
+    "insufficient_scope"
+   ],
+   "name": "insufficient_scope_partial",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": [
+     "invoices:read",
+     "invoices:write"
+    ],
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.hlwhZ-7wmh2BE4cffBQZauuqd4IS1GAeLPvN1t5MPYTI1EG_iqyQ_lLpvybbna7h6pQv09Rh6GHmuHQdk9oeCw",
+   "why": "every required scope must be held"
+  },
+  {
+   "expect": [
+    "insufficient_scope"
+   ],
+   "name": "scope_nbsp_is_not_a_separator",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": [
+     "invoices:write"
+    ],
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiaW52b2ljZXM6cmVhZFx1MDBhMGludm9pY2VzOndyaXRlIiwic3ViIjoidV9hbGljZSIsInVzZXJfaXNzIjoiZGVsY3JlZCJ9.baGHhjKDIiYOdritU_nkZYT4vNynvUPD0iVhcV9KA5gdHfxOtKCGLUo8vEXmshHcnkuoSMJRZ-m6veQXAMtVBw",
+   "why": "only ASCII space separates scopes; NBSP is part of the token"
+  },
+  {
+   "expect": [
+    "insufficient_scope"
+   ],
+   "name": "scope_prefix_not_substring",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": [
+     "invoices:read"
+    ],
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiaW52b2ljZXM6cmVhZG9ubHkiLCJzdWIiOiJ1X2FsaWNlIiwidXNlcl9pc3MiOiJkZWxjcmVkIn0.WRRay_3gXFRACDoHVtKoZ77dTq0UKHf9WKEOLrPjy4zaV-LtpzM0X-LmiWTePkFYBwwAKd-C23oyMuVW_TKgBg",
+   "why": "scope compare is whole-token, not prefix"
+  },
+  {
+   "expect": [
+    "invalid_token"
+   ],
+   "name": "alg_none",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJub25lIiwia2lkIjoiR1l1VDlxT1pfandnM0dzQ0IyZFFrV0tHbWVnUlN4QV9DSXZ4dVU0OVVTbyIsInR5cCI6ImF0K2p3dCJ9.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.",
+   "why": "alg=none"
+  },
+  {
+   "expect": [
+    "invalid_token"
+   ],
+   "name": "alg_hs256_public_key_as_secret",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJIUzI1NiIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.b1DTyCCI0YVcdJRbfscG6Gwy3VzSL5weUQ-fzddKAEM",
+   "why": "HMAC keyed with the public key (alg confusion)"
+  },
+  {
+   "expect": [
+    "invalid_token"
+   ],
+   "name": "alg_rs256_header",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJSUzI1NiIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.eA_m7UJq7iidEqccaP9ZAwyejgpyxWxsyUkvvTnJ5y76SVswaDCtL_pPANwE88KjMIT30bOHE_lusOzzBTXbDQ",
+   "why": "only EdDSA is accepted"
+  },
+  {
+   "expect": [
+    "invalid_token"
+   ],
+   "name": "header_missing_typ",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28ifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.H-JzIoPNpW-Azc7z4_G6xp7aP-SA4LQwfAJsJ53GKZKVg1hHyL1eNg8R3AezAUsQZtc7T1cDKbTRA43PpxTEDw",
+   "why": "typ must be at+jwt (RFC 9068)"
+  },
+  {
+   "expect": [
+    "invalid_token"
+   ],
+   "name": "header_typ_jwt",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJKV1QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.J5enfa0vjXMRRzoaWtHelzjg97DT1hCSWukDip7mJn1bs3_fc9BFduzULpTlYsOyguytuWMjygP8tnlZ8fQWAA",
+   "why": "a plain JWT is not an access token"
+  },
+  {
+   "expect": [
+    "ok"
+   ],
+   "name": "header_typ_case_insensitive",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJBVCtKV1QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.9iinJmOBuv5W1XiHRuPq7sNqysA2c3dXL8JSWGsVXQeTe8TgRinlYR1dQQBbSdc3Yn1fouhDtU64pquUV5-pBw",
+   "why": "typ compares case-insensitively"
+  },
+  {
+   "expect": [
+    "ok"
+   ],
+   "name": "header_application_at_jwt",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhcHBsaWNhdGlvbi9hdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.jsb7j4XMIYucBW4ZYTAhX_kC2Rqd0XCnykbdoNKEoKEBdqumdF3VvAClsIljrnLeTRBYtJZ633IthxWT7KVPAw",
+   "why": "full media type accepted"
+  },
+  {
+   "expect": [
+    "invalid_token"
+   ],
+   "name": "header_embedded_jwk",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImp3ayI6eyJjcnYiOiJFZDI1NTE5Iiwia3R5IjoiT0tQIiwieCI6IlR1SHlEOFQ1b2t1el9oWjY1Mk13SmxpNHZHR2hvTXZBUkVNZnpFTng1VEUifSwia2lkIjoiR1l1VDlxT1pfandnM0dzQ0IyZFFrV0tHbWVnUlN4QV9DSXZ4dVU0OVVTbyIsInR5cCI6ImF0K2p3dCJ9.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.32lcFJ6XCSgNvqQ8tg9i9O6jp370pENid3ErWjpvXhfk0Xug3j2xgeMfc-LJPf4u0dQkDJDTDStyXpko_twLCQ",
+   "why": "attacker-supplied key in the header must never be used"
+  },
+  {
+   "expect": [
+    "invalid_token"
+   ],
+   "name": "header_jku",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImprdSI6Imh0dHBzOi8vZXZpbC50ZXN0L2p3a3MuanNvbiIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.S82Du7HLrXVS6JuRxoulnH-p3534iY0bku8ZiGwz0OHedygk3o4U79dUCkLgCzJNaB7FJCB13D0sxvXzROk4CA",
+   "why": "jku is not accepted"
+  },
+  {
+   "expect": [
+    "invalid_token"
+   ],
+   "name": "header_x5u",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QiLCJ4NXUiOiJodHRwczovL2V2aWwudGVzdC9jZXJ0In0.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.s2RtVGikJG-VVKkj7x3UuGeRN1NMynMTOVAGA29_lRWMefBIqzfbWXpWS6wzuSTv18SS4zGEq_AaKlvUmr6bAw",
+   "why": "x5u is not accepted"
+  },
+  {
+   "expect": [
+    "invalid_token"
+   ],
+   "name": "header_crit",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImNyaXQiOlsiZXhwIl0sImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.9ro_bW13QBN5fOjbD7kQPUS-3DB9rHKoRw6HCztLKSiFBCnAmqDmM5jy72-nuGQwv8m-K9tD9AhheL9lrOBrBA",
+   "why": "crit extensions are not understood"
+  },
+  {
+   "expect": [
+    "invalid_token"
+   ],
+   "name": "kid_unknown",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6Im5vdC1pbi10aGUtandrcyIsInR5cCI6ImF0K2p3dCJ9.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.A_ruewkylr-IeHup6ZMo31dN_18e5S8dII4RtlPuHFfM6ceEatSUrh-Co_w-BMMV3ti81rksCYXmy9VE_i1fBQ",
+   "why": "kid must resolve in the JWKS"
+  },
+  {
+   "expect": [
+    "invalid_token"
+   ],
+   "name": "kid_missing",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsInR5cCI6ImF0K2p3dCJ9.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.AhDJpFLGxkZysvBPuZRCs5_WJmMjUNYCT9bYzOm4lrQLxbWPuaGQ-v0V_6_9jn1Y-piB1UDG3CvDCpKUyVCaAg",
+   "why": "offline verification requires kid"
+  },
+  {
+   "expect": [
+    "invalid_token"
+   ],
+   "name": "signature_wrong_key",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.ToLc5GccYHhrUdKAyy-KDDQ4m6KAvrS3sM28S3LxOngNV_4BRrsk31yuWrs2mKCHGTuaaokXVr5I1R8rAvdKDg",
+   "why": "correct kid, attacker's signature"
+  },
+  {
+   "expect": [
+    "invalid_token"
+   ],
+   "name": "payload_tampered",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": [
+     "admin:all"
+    ],
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiYWRtaW46YWxsIiwic3ViIjoidV9hbGljZSIsInVzZXJfaXNzIjoiZGVsY3JlZCJ9.hlwhZ-7wmh2BE4cffBQZauuqd4IS1GAeLPvN1t5MPYTI1EG_iqyQ_lLpvybbna7h6pQv09Rh6GHmuHQdk9oeCw",
+   "why": "payload edited after signing"
+  },
+  {
+   "expect": [
+    "invalid_token"
+   ],
+   "name": "signature_truncated",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.hlwhZ-7wmh2BE4cffBQZauuqd4IS1GAeLPvN1t5MPYTI1EG_iqyQ_lLpvybbna7h6pQv09Rh6GHmuHQdk9",
+   "why": "signature shorter than 64 bytes"
+  },
+  {
+   "expect": [
+    "invalid_token"
+   ],
+   "name": "signature_padded_base64",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.hlwhZ-7wmh2BE4cffBQZauuqd4IS1GAeLPvN1t5MPYTI1EG_iqyQ_lLpvybbna7h6pQv09Rh6GHmuHQdk9oeCw=",
+   "why": "base64url must be unpadded"
+  },
+  {
+   "expect": [
+    "invalid_token"
+   ],
+   "name": "signature_noncanonical_base64",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.hlwhZ-7wmh2BE4cffBQZauuqd4IS1GAeLPvN1t5MPYTI1EG_iqyQ_lLpvybbna7h6pQv09Rh6GHmuHQdk9oeCx",
+   "why": "trailing padding bits must be zero (same bytes, different text = malleable token)"
+  },
+  {
+   "expect": [
+    "invalid_token"
+   ],
+   "name": "token_four_segments",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.hlwhZ-7wmh2BE4cffBQZauuqd4IS1GAeLPvN1t5MPYTI1EG_iqyQ_lLpvybbna7h6pQv09Rh6GHmuHQdk9oeCw.AAAA",
+   "why": "compact JWS has exactly three segments"
+  },
+  {
+   "expect": [
+    "invalid_token"
+   ],
+   "name": "token_empty_signature",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.",
+   "why": "empty signature"
+  },
+  {
+   "expect": [
+    "invalid_token"
+   ],
+   "name": "token_not_json_payload",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSJ9.bm90LWpzb24.AAAA",
+   "why": "payload is not JSON"
+  },
+  {
+   "expect": [
+    "invalid_token"
+   ],
+   "name": "token_oversized",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInBhZCI6Inh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4Iiwic2NvcGUiOiJjdXN0b21lcnM6cmVhZCBpbnZvaWNlczpyZWFkIiwic3ViIjoidV9hbGljZSIsInVzZXJfaXNzIjoiZGVsY3JlZCJ9.WMHmoWwb0TXQJ260FlpivB3JXKTuzohXRDGiezH8fLQ8WU776Qea0b0QehijnV7Q13xcUV-dfnc7h4_YDFKECw",
+   "why": "tokens over 16 KiB are refused before parsing"
+  },
+  {
+   "expect": [
+    "invalid_token"
+   ],
+   "name": "order_signature_before_expiry",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800099999,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiYWRtaW46YWxsIiwic3ViIjoidV9hbGljZSIsInVzZXJfaXNzIjoiZGVsY3JlZCJ9.hlwhZ-7wmh2BE4cffBQZauuqd4IS1GAeLPvN1t5MPYTI1EG_iqyQ_lLpvybbna7h6pQv09Rh6GHmuHQdk9oeCw",
+   "why": "bad signature wins over expiry"
+  },
+  {
+   "expect": [
+    "expired"
+   ],
+   "name": "order_expiry_before_audience",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800099999,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://other.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.hlwhZ-7wmh2BE4cffBQZauuqd4IS1GAeLPvN1t5MPYTI1EG_iqyQ_lLpvybbna7h6pQv09Rh6GHmuHQdk9oeCw",
+   "why": "expired wins over audience"
+  },
+  {
+   "expect": [
+    "wrong_audience"
+   ],
+   "name": "order_audience_before_scope",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": [
+     "x:y"
+    ],
+    "resource": "https://other.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.hlwhZ-7wmh2BE4cffBQZauuqd4IS1GAeLPvN1t5MPYTI1EG_iqyQ_lLpvybbna7h6pQv09Rh6GHmuHQdk9oeCw",
+   "why": "audience wins over scope"
+  },
+  {
+   "expect": [
+    "invalid_token"
+   ],
+   "name": "issuer_wrong",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiaHR0cHM6Ly9ldmlsLnRlc3QiLCJqdGkiOiJqdGktMDAwMSIsImtpbmQiOiJkZWxlZ2F0aW9uIiwibmJmIjoxNzk5OTk5OTQwLCJzY29wZSI6ImN1c3RvbWVyczpyZWFkIGludm9pY2VzOnJlYWQiLCJzdWIiOiJ1X2FsaWNlIiwidXNlcl9pc3MiOiJkZWxjcmVkIn0.Mp_0qwbIJDiUUGaTnCt84J8WwNlT4jdEXNCZtdfFhxS7PpG_blHqhkQ9I-C1m1nfI0XNFJ9MlRoDpvvONJS7AA",
+   "why": "iss must be exactly delcred"
+  },
+  {
+   "expect": [
+    "invalid_token"
+   ],
+   "name": "kind_user",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6InVzZXIiLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.IujC1-frO03zQx6KAzM9vI3twDD0s85_8D52ygetPA9tw1qfeYpAFyWjsEC-dMkG_MfzzgW-F8MpX_OlQ5xsBQ",
+   "why": "an identity assertion is not a delegation"
+  },
+  {
+   "expect": [
+    "invalid_token"
+   ],
+   "name": "kind_agent",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImFnZW50IiwibmJmIjoxNzk5OTk5OTQwLCJzY29wZSI6ImN1c3RvbWVyczpyZWFkIGludm9pY2VzOnJlYWQiLCJzdWIiOiJ1X2FsaWNlIiwidXNlcl9pc3MiOiJkZWxjcmVkIn0.Lhgbbujwmh12-1LfF1VT_AfXOBtf0ZoTriPmYOSMKRMXecM-Kv9bDY98V79norC-7_iED9iEs0A60DYw1yIJAA",
+   "why": "an agent identity token is not a delegation"
+  },
+  {
+   "expect": [
+    "invalid_token"
+   ],
+   "name": "missing_sub",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInVzZXJfaXNzIjoiZGVsY3JlZCJ9.PpO3MkIDa_GavVOIZr7ofYCqoWpd8K92X3giCUDmbjmZriX1ZvlqLBJ_bujkiDEdxlEldTnGOb7ggcNOd1A6AQ",
+   "why": "sub required"
+  },
+  {
+   "expect": [
+    "invalid_token"
+   ],
+   "name": "missing_act",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.tWXmWCLsZXf5bJGaCKlUhsO5pZfVtqVfL-DEctsVNci2JqOu16OywY7UB7WLRu7Vv7a6aq9imAS7XV5VsyroBA",
+   "why": "act required (who is acting)"
+  },
+  {
+   "expect": [
+    "invalid_token"
+   ],
+   "name": "act_not_object",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOiJiaWxsaW5nLWFnZW50IiwiYXVkIjoiaHR0cHM6Ly9hcGkuYWNtZS50ZXN0L3YxIiwiZXhwIjoxODAwMDAwODQwLCJpYXQiOjE3OTk5OTk5NDAsImlzcyI6ImRlbGNyZWQiLCJqdGkiOiJqdGktMDAwMSIsImtpbmQiOiJkZWxlZ2F0aW9uIiwibmJmIjoxNzk5OTk5OTQwLCJzY29wZSI6ImN1c3RvbWVyczpyZWFkIGludm9pY2VzOnJlYWQiLCJzdWIiOiJ1X2FsaWNlIiwidXNlcl9pc3MiOiJkZWxjcmVkIn0.DphxA_zHyS9YwRy7xb2qnhm9IEaNG-6PibclUR0WXczq4nEgI1-jsL9O9YMXccXeoavPe5DUt89X7JVYcFIrAw",
+   "why": "act must be an object"
+  },
+  {
+   "expect": [
+    "invalid_token"
+   ],
+   "name": "missing_jti",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImtpbmQiOiJkZWxlZ2F0aW9uIiwibmJmIjoxNzk5OTk5OTQwLCJzY29wZSI6ImN1c3RvbWVyczpyZWFkIGludm9pY2VzOnJlYWQiLCJzdWIiOiJ1X2FsaWNlIiwidXNlcl9pc3MiOiJkZWxjcmVkIn0.2NuTSpEBB52PJYOfaElQGCe1HNUQA-T-VQ8kwFxjJ815B52h8dbR022SdFEV0qgJ9fLQljSrNim11Xt_O91yCg",
+   "why": "jti required (revocation handle)"
+  },
+  {
+   "expect": [
+    "invalid_token"
+   ],
+   "name": "exp_as_string",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOiIxODAwMDAwODQwIiwiaWF0IjoxNzk5OTk5OTQwLCJpc3MiOiJkZWxjcmVkIiwianRpIjoianRpLTAwMDEiLCJraW5kIjoiZGVsZWdhdGlvbiIsIm5iZiI6MTc5OTk5OTk0MCwic2NvcGUiOiJjdXN0b21lcnM6cmVhZCBpbnZvaWNlczpyZWFkIiwic3ViIjoidV9hbGljZSIsInVzZXJfaXNzIjoiZGVsY3JlZCJ9.CRM3OYW-73p9PSmR21OwMgH4smSg6tXEQrr7stWXfrN6s6gS7DfcfEZ6732-mkXG04CQEdoQHA3iwuoGQm4BDQ",
+   "why": "exp must be an integer"
+  },
+  {
+   "expect": [
+    "invalid_token"
+   ],
+   "name": "exp_as_float",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAuNSwiaWF0IjoxNzk5OTk5OTQwLCJpc3MiOiJkZWxjcmVkIiwianRpIjoianRpLTAwMDEiLCJraW5kIjoiZGVsZWdhdGlvbiIsIm5iZiI6MTc5OTk5OTk0MCwic2NvcGUiOiJjdXN0b21lcnM6cmVhZCBpbnZvaWNlczpyZWFkIiwic3ViIjoidV9hbGljZSIsInVzZXJfaXNzIjoiZGVsY3JlZCJ9.gKNJtFmvUrk5RCIxMWU5giVgPk6bUbumeYv6jTVCbxFDtC5xiUT44dhZsWd2ECnm3nisVeXTSjaWTEALkYBUAg",
+   "why": "NumericDate must be an integer in delcred"
+  },
+  {
+   "expect": [
+    "invalid_token"
+   ],
+   "name": "exp_missing",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJpYXQiOjE3OTk5OTk5NDAsImlzcyI6ImRlbGNyZWQiLCJqdGkiOiJqdGktMDAwMSIsImtpbmQiOiJkZWxlZ2F0aW9uIiwibmJmIjoxNzk5OTk5OTQwLCJzY29wZSI6ImN1c3RvbWVyczpyZWFkIGludm9pY2VzOnJlYWQiLCJzdWIiOiJ1X2FsaWNlIiwidXNlcl9pc3MiOiJkZWxjcmVkIn0.3DPMWOdzowx5bnF6EbEt0OWgmqkzpc6Z8QAUtUQL7sPePWjiImoI1X0kFlcFdhKjFuE6SfnlFG1WRbr9aLaqDA",
+   "why": "exp required"
+  },
+  {
+   "expect": [
+    "invalid_token"
+   ],
+   "name": "chain_length_mismatch",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsiYWN0Ijp7InN1YiI6ImEifSwic3ViIjoiYiJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJjaGFpbiI6W10sImV4cCI6MTgwMDAwMDg0MCwiaWF0IjoxNzk5OTk5OTQwLCJpc3MiOiJkZWxjcmVkIiwianRpIjoianRpLTAwMDEiLCJraW5kIjoiZGVsZWdhdGlvbiIsIm5iZiI6MTc5OTk5OTk0MCwic2NvcGUiOiJjdXN0b21lcnM6cmVhZCBpbnZvaWNlczpyZWFkIiwic3ViIjoidV9hbGljZSIsInVzZXJfaXNzIjoiZGVsY3JlZCJ9.2ukbzl07Jb9YaWdPH2z2lbjWRM1r3IwennP_DD9j4KA1_DAjLFAd06jhpWmC7iORwEd6_CugRa2NMHM4Mp7gAA",
+   "why": "chain must list one ancestor jti per extra actor"
+  },
+  {
+   "expect": [
+    "invalid_token"
+   ],
+   "name": "chain_without_nested_act",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJjaGFpbiI6WyJqMSJdLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.aziB9PGDbOsrPkHjODus1ny_B8cvlLikqgYzyBdoL5vOiBu_V0QXImt-jWTJxwYdyUZlK1SdX4DhQs6bqAR3DQ",
+   "why": "chain present but act not nested"
+  },
+  {
+   "expect": [
+    "invalid_token"
+   ],
+   "name": "act_too_deep",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsiYWN0Ijp7ImFjdCI6eyJhY3QiOnsiYWN0Ijp7ImFjdCI6eyJzdWIiOiJ6In0sInN1YiI6ImEifSwic3ViIjoiYiJ9LCJzdWIiOiJjIn0sInN1YiI6ImQifSwic3ViIjoiZSJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJjaGFpbiI6WyIxIiwiMiIsIjMiLCI0IiwiNSJdLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.5-5JEG2gvii9tDy1NfnqOq-NT_KBH4jxza_9V3PQ_b5Csz3Y9TtiUs0MY2oDjulhNjr-33Vpy0iFo0q9IIzsDA",
+   "why": "more than 4 sub-delegation hops"
+  },
+  {
+   "expect": [
+    "invalid_token"
+   ],
+   "name": "cnf_unsupported_member",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJjbmYiOnsieDV0I1MyNTYiOiJhYmMifSwiZXhwIjoxODAwMDAwODQwLCJpYXQiOjE3OTk5OTk5NDAsImlzcyI6ImRlbGNyZWQiLCJqdGkiOiJqdGktMDAwMSIsImtpbmQiOiJkZWxlZ2F0aW9uIiwibmJmIjoxNzk5OTk5OTQwLCJzY29wZSI6ImN1c3RvbWVyczpyZWFkIGludm9pY2VzOnJlYWQiLCJzdWIiOiJ1X2FsaWNlIiwidXNlcl9pc3MiOiJkZWxjcmVkIn0.NHBFnbwkzgNt_L7yL4J_3tv1H7yfjzMYURWauQny3DbKzEzbjlLtdhfbNP8UHAVxsHeP1kFIS0HIv2OkJcOFBw",
+   "why": "unknown confirmation method fails closed"
+  },
+  {
+   "expect": [
+    "invalid_token"
+   ],
+   "name": "cnf_jkt_empty",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJjbmYiOnsiamt0IjoiIn0sImV4cCI6MTgwMDAwMDg0MCwiaWF0IjoxNzk5OTk5OTQwLCJpc3MiOiJkZWxjcmVkIiwianRpIjoianRpLTAwMDEiLCJraW5kIjoiZGVsZWdhdGlvbiIsIm5iZiI6MTc5OTk5OTk0MCwic2NvcGUiOiJjdXN0b21lcnM6cmVhZCBpbnZvaWNlczpyZWFkIiwic3ViIjoidV9hbGljZSIsInVzZXJfaXNzIjoiZGVsY3JlZCJ9.7jATc7tl3OVnBfYhG1zGzaA0Ago1mXjVO5FvdSuCh2H-JiePNLhGp-nQeE1pPq_HrOVfd-cEgd6KbPlnrE0gBQ",
+   "why": "empty jkt"
+  },
+  {
+   "expect": [
+    "ok"
+   ],
+   "name": "bulletin_clean",
+   "request": {
+    "bulletin": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJkZWxjcmVkLXJlditqd3QifQ.eyJhZ2VudHMiOlsib3RoZXIiXSwiZXhwIjoxODAwMDAwMjkwLCJpYXQiOjE3OTk5OTk5OTAsImlzcyI6ImRlbGNyZWQiLCJqdGlzIjpbInVucmVsYXRlZCJdLCJzZXEiOjEsInVzZXJzIjpbXX0.J_3kO3QTyvqtV6vMdxwgVOSJORk0BrWdtdLTMCKQ8DGLYfQ5OSmJMYhJio8ZZMZ8I1fQwJUuhpvkKtjXcAeOCA",
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.hlwhZ-7wmh2BE4cffBQZauuqd4IS1GAeLPvN1t5MPYTI1EG_iqyQ_lLpvybbna7h6pQv09Rh6GHmuHQdk9oeCw",
+   "why": "fresh bulletin, nothing matching"
+  },
+  {
+   "expect": [
+    "revoked"
+   ],
+   "name": "revoked_jti",
+   "request": {
+    "bulletin": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJkZWxjcmVkLXJlditqd3QifQ.eyJhZ2VudHMiOltdLCJleHAiOjE4MDAwMDAyOTAsImlhdCI6MTc5OTk5OTk5MCwiaXNzIjoiZGVsY3JlZCIsImp0aXMiOlsianRpLTAwMDEiXSwic2VxIjoxLCJ1c2VycyI6W119.7NJVujDrNPkjmw7nxEjEGXolu-yFbLj8OpDnJcK30lOmCManjJXc6HM26TUlX7Sb9xFfBK_vT3MCGwfeYDR6CA",
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.hlwhZ-7wmh2BE4cffBQZauuqd4IS1GAeLPvN1t5MPYTI1EG_iqyQ_lLpvybbna7h6pQv09Rh6GHmuHQdk9oeCw",
+   "why": "token id on the bulletin"
+  },
+  {
+   "expect": [
+    "revoked"
+   ],
+   "name": "revoked_agent",
+   "request": {
+    "bulletin": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJkZWxjcmVkLXJlditqd3QifQ.eyJhZ2VudHMiOlsiYmlsbGluZy1hZ2VudCJdLCJleHAiOjE4MDAwMDAyOTAsImlhdCI6MTc5OTk5OTk5MCwiaXNzIjoiZGVsY3JlZCIsImp0aXMiOltdLCJzZXEiOjEsInVzZXJzIjpbXX0.nH9ZymL8Zi9EmsvGKcfwGjmhcqw87QVql-j-9iE60ThR6Z6ap4t6Zn-Ota5sWH7u4udXRvEeJT-oW2nrPZndCw",
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.hlwhZ-7wmh2BE4cffBQZauuqd4IS1GAeLPvN1t5MPYTI1EG_iqyQ_lLpvybbna7h6pQv09Rh6GHmuHQdk9oeCw",
+   "why": "agent kill switch"
+  },
+  {
+   "expect": [
+    "revoked"
+   ],
+   "name": "revoked_user_any_issuer",
+   "request": {
+    "bulletin": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJkZWxjcmVkLXJlditqd3QifQ.eyJhZ2VudHMiOltdLCJleHAiOjE4MDAwMDAyOTAsImlhdCI6MTc5OTk5OTk5MCwiaXNzIjoiZGVsY3JlZCIsImp0aXMiOltdLCJzZXEiOjEsInVzZXJzIjpbeyJzdWIiOiJ1X2FsaWNlIn1dfQ.KCuVBj50vX-hHegyDFf9fqte38wsH9Ozw0Uh9FXx-ow1acFyrSN_3JHQNeanN1uZKnj-qgnlcgtgUKbMvat5DQ",
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.hlwhZ-7wmh2BE4cffBQZauuqd4IS1GAeLPvN1t5MPYTI1EG_iqyQ_lLpvybbna7h6pQv09Rh6GHmuHQdk9oeCw",
+   "why": "user kill switch without issuer"
+  },
+  {
+   "expect": [
+    "revoked"
+   ],
+   "name": "revoked_user_matching_issuer",
+   "request": {
+    "bulletin": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJkZWxjcmVkLXJlditqd3QifQ.eyJhZ2VudHMiOltdLCJleHAiOjE4MDAwMDAyOTAsImlhdCI6MTc5OTk5OTk5MCwiaXNzIjoiZGVsY3JlZCIsImp0aXMiOltdLCJzZXEiOjEsInVzZXJzIjpbeyJpc3MiOiJkZWxjcmVkIiwic3ViIjoidV9hbGljZSJ9XX0.3J11ID7QNpicwiigAhBwaGnmzTb-LjfuC0UtW7GUlzmbRD59dVpFTpuf3nbwJSYS3poEDgCJAKnSMuBpBj9QAg",
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.hlwhZ-7wmh2BE4cffBQZauuqd4IS1GAeLPvN1t5MPYTI1EG_iqyQ_lLpvybbna7h6pQv09Rh6GHmuHQdk9oeCw",
+   "why": "(issuer, sub) match"
+  },
+  {
+   "expect": [
+    "ok"
+   ],
+   "name": "not_revoked_user_other_issuer",
+   "request": {
+    "bulletin": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJkZWxjcmVkLXJlditqd3QifQ.eyJhZ2VudHMiOltdLCJleHAiOjE4MDAwMDAyOTAsImlhdCI6MTc5OTk5OTk5MCwiaXNzIjoiZGVsY3JlZCIsImp0aXMiOltdLCJzZXEiOjEsInVzZXJzIjpbeyJpc3MiOiJodHRwczovL2lkcC50ZXN0Iiwic3ViIjoidV9hbGljZSJ9XX0.-75INgJ2TkH6SO_pHYbDJpCPW2JD66v6vai0OUHppcFxLB1D8byTpo0vWUuFhkYR0NEKQeEOdy6-lNpdEwKUAA",
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.hlwhZ-7wmh2BE4cffBQZauuqd4IS1GAeLPvN1t5MPYTI1EG_iqyQ_lLpvybbna7h6pQv09Rh6GHmuHQdk9oeCw",
+   "why": "same sub under another IdP is a different user"
+  },
+  {
+   "expect": [
+    "revoked"
+   ],
+   "name": "revoked_chain_ancestor_jti",
+   "request": {
+    "bulletin": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJkZWxjcmVkLXJlditqd3QifQ.eyJhZ2VudHMiOltdLCJleHAiOjE4MDAwMDAyOTAsImlhdCI6MTc5OTk5OTk5MCwiaXNzIjoiZGVsY3JlZCIsImp0aXMiOlsianRpLXBhcmVudCJdLCJzZXEiOjEsInVzZXJzIjpbXX0.Xowg-LhmVujfXP5NDcVQAG2jcmlwvvMicaYjw5HyzZkU6ILlPYRfsCOCHov4LOyHBiCbIG5Dn0sdzEkwQt8gCQ",
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsiYWN0Ijp7InN1YiI6ImJpbGxpbmctYWdlbnQifSwic3ViIjoic3VtbWFyaXplciJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJjaGFpbiI6WyJqdGktcGFyZW50Il0sImV4cCI6MTgwMDAwMDg0MCwiaWF0IjoxNzk5OTk5OTQwLCJpc3MiOiJkZWxjcmVkIiwianRpIjoianRpLTAwMDIiLCJraW5kIjoiZGVsZWdhdGlvbiIsIm5iZiI6MTc5OTk5OTk0MCwic2NvcGUiOiJjdXN0b21lcnM6cmVhZCBpbnZvaWNlczpyZWFkIiwic3ViIjoidV9hbGljZSIsInVzZXJfaXNzIjoiZGVsY3JlZCJ9.psh1dlqs18E5gbHBwjQyO78czESzg1-tACk3KM4FvIsjNaJIHTr_Xj1tPZjNliHR-ALji9VJu8B_AaLgT4YECQ",
+   "why": "revoking the parent delegation kills the child"
+  },
+  {
+   "expect": [
+    "revoked"
+   ],
+   "name": "revoked_chain_root_agent",
+   "request": {
+    "bulletin": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJkZWxjcmVkLXJlditqd3QifQ.eyJhZ2VudHMiOlsiYmlsbGluZy1hZ2VudCJdLCJleHAiOjE4MDAwMDAyOTAsImlhdCI6MTc5OTk5OTk5MCwiaXNzIjoiZGVsY3JlZCIsImp0aXMiOltdLCJzZXEiOjEsInVzZXJzIjpbXX0.nH9ZymL8Zi9EmsvGKcfwGjmhcqw87QVql-j-9iE60ThR6Z6ap4t6Zn-Ota5sWH7u4udXRvEeJT-oW2nrPZndCw",
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsiYWN0Ijp7InN1YiI6ImJpbGxpbmctYWdlbnQifSwic3ViIjoic3VtbWFyaXplciJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJjaGFpbiI6WyJqdGktcGFyZW50Il0sImV4cCI6MTgwMDAwMDg0MCwiaWF0IjoxNzk5OTk5OTQwLCJpc3MiOiJkZWxjcmVkIiwianRpIjoianRpLTAwMDIiLCJraW5kIjoiZGVsZWdhdGlvbiIsIm5iZiI6MTc5OTk5OTk0MCwic2NvcGUiOiJjdXN0b21lcnM6cmVhZCBpbnZvaWNlczpyZWFkIiwic3ViIjoidV9hbGljZSIsInVzZXJfaXNzIjoiZGVsY3JlZCJ9.psh1dlqs18E5gbHBwjQyO78czESzg1-tACk3KM4FvIsjNaJIHTr_Xj1tPZjNliHR-ALji9VJu8B_AaLgT4YECQ",
+   "why": "revoking any agent in the chain kills it"
+  },
+  {
+   "expect": [
+    "revoked"
+   ],
+   "name": "revoked_chain_leaf_agent",
+   "request": {
+    "bulletin": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJkZWxjcmVkLXJlditqd3QifQ.eyJhZ2VudHMiOlsic3VtbWFyaXplciJdLCJleHAiOjE4MDAwMDAyOTAsImlhdCI6MTc5OTk5OTk5MCwiaXNzIjoiZGVsY3JlZCIsImp0aXMiOltdLCJzZXEiOjEsInVzZXJzIjpbXX0.rYb_88UzM3d4UHvOIra4C4YfFtykHJAKHYrjR4I0LHetu5YC1aHXNCbv1CDzjiTBzHGXBRdkJn8VPDtIuh4gAw",
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsiYWN0Ijp7InN1YiI6ImJpbGxpbmctYWdlbnQifSwic3ViIjoic3VtbWFyaXplciJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJjaGFpbiI6WyJqdGktcGFyZW50Il0sImV4cCI6MTgwMDAwMDg0MCwiaWF0IjoxNzk5OTk5OTQwLCJpc3MiOiJkZWxjcmVkIiwianRpIjoianRpLTAwMDIiLCJraW5kIjoiZGVsZWdhdGlvbiIsIm5iZiI6MTc5OTk5OTk0MCwic2NvcGUiOiJjdXN0b21lcnM6cmVhZCBpbnZvaWNlczpyZWFkIiwic3ViIjoidV9hbGljZSIsInVzZXJfaXNzIjoiZGVsY3JlZCJ9.psh1dlqs18E5gbHBwjQyO78czESzg1-tACk3KM4FvIsjNaJIHTr_Xj1tPZjNliHR-ALji9VJu8B_AaLgT4YECQ",
+   "why": "\u2026including the leaf"
+  },
+  {
+   "expect": [
+    "revocation_data_invalid"
+   ],
+   "name": "bulletin_stale",
+   "request": {
+    "bulletin": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJkZWxjcmVkLXJlditqd3QifQ.eyJhZ2VudHMiOltdLCJleHAiOjE4MDAwMDA2MDAsImlhdCI6MTc5OTk5OTY5OSwiaXNzIjoiZGVsY3JlZCIsImp0aXMiOltdLCJzZXEiOjEsInVzZXJzIjpbXX0.cB4q6xL8A5GVk4TkC1G9ajUd3lwHj0BBUx-a5LN8qEXwDd7BZv3BXRCojKxIDv45h_AO8uvTT8_0snDExe3iCQ",
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.hlwhZ-7wmh2BE4cffBQZauuqd4IS1GAeLPvN1t5MPYTI1EG_iqyQ_lLpvybbna7h6pQv09Rh6GHmuHQdk9oeCw",
+   "why": "bulletin older than the verifier's max age (rollback defence)"
+  },
+  {
+   "expect": [
+    "revocation_data_invalid"
+   ],
+   "name": "bulletin_expired",
+   "request": {
+    "bulletin": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJkZWxjcmVkLXJlditqd3QifQ.eyJhZ2VudHMiOltdLCJleHAiOjE3OTk5OTk5MzksImlhdCI6MTc5OTk5OTgwMCwiaXNzIjoiZGVsY3JlZCIsImp0aXMiOltdLCJzZXEiOjEsInVzZXJzIjpbXX0.CeRKSZ_KmSLXpWXlCwe4da5lReTDacekXORev0j1Uj4fVzpFSK8Z_P7FZL00Jf5u7KvAIaARYrVUWiM1pZrMDA",
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.hlwhZ-7wmh2BE4cffBQZauuqd4IS1GAeLPvN1t5MPYTI1EG_iqyQ_lLpvybbna7h6pQv09Rh6GHmuHQdk9oeCw",
+   "why": "bulletin past its own exp"
+  },
+  {
+   "expect": [
+    "revocation_data_invalid"
+   ],
+   "name": "bulletin_future",
+   "request": {
+    "bulletin": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJkZWxjcmVkLXJlditqd3QifQ.eyJhZ2VudHMiOltdLCJleHAiOjE4MDAwMDA2MDAsImlhdCI6MTgwMDAwMDA2MSwiaXNzIjoiZGVsY3JlZCIsImp0aXMiOltdLCJzZXEiOjEsInVzZXJzIjpbXX0.4JLgIEGb-DkW0ugWzekL-RPy6DCbxbYoXMsytdMsVpJsZiFP34sse6sfEA7xlvxUyKP5AUbBqGiATjEX5DKqBg",
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.hlwhZ-7wmh2BE4cffBQZauuqd4IS1GAeLPvN1t5MPYTI1EG_iqyQ_lLpvybbna7h6pQv09Rh6GHmuHQdk9oeCw",
+   "why": "bulletin from the future"
+  },
+  {
+   "expect": [
+    "revocation_data_invalid"
+   ],
+   "name": "bulletin_wrong_key",
+   "request": {
+    "bulletin": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJkZWxjcmVkLXJlditqd3QifQ.eyJhZ2VudHMiOltdLCJleHAiOjE4MDAwMDAyOTAsImlhdCI6MTc5OTk5OTk5MCwiaXNzIjoiZGVsY3JlZCIsImp0aXMiOltdLCJzZXEiOjEsInVzZXJzIjpbXX0.DIvIliapPEKkwznBro2ChXMT3w31846qHwuR_IjNmNZDb1N4lhSwF0EBkN6o3FC3fQnJOYKEwcOvdU7NsKcoDw",
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.hlwhZ-7wmh2BE4cffBQZauuqd4IS1GAeLPvN1t5MPYTI1EG_iqyQ_lLpvybbna7h6pQv09Rh6GHmuHQdk9oeCw",
+   "why": "forged empty bulletin"
+  },
+  {
+   "expect": [
+    "revocation_data_invalid"
+   ],
+   "name": "bulletin_wrong_typ",
+   "request": {
+    "bulletin": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJKV1QifQ.eyJhZ2VudHMiOltdLCJleHAiOjE4MDAwMDAyOTAsImlhdCI6MTc5OTk5OTk5MCwiaXNzIjoiZGVsY3JlZCIsImp0aXMiOltdLCJzZXEiOjEsInVzZXJzIjpbXX0.GERt4PnVxEFHnRUE2GV73T7uUb56As_pr934PRhYwbHGugvX9XR0rWmyadFQkI99h9x_fIIbCr2Y1qo2jDWECg",
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.hlwhZ-7wmh2BE4cffBQZauuqd4IS1GAeLPvN1t5MPYTI1EG_iqyQ_lLpvybbna7h6pQv09Rh6GHmuHQdk9oeCw",
+   "why": "bulletin typ must be delcred-rev+jwt"
+  },
+  {
+   "expect": [
+    "revocation_data_invalid"
+   ],
+   "name": "bulletin_wrong_issuer",
+   "request": {
+    "bulletin": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJkZWxjcmVkLXJlditqd3QifQ.eyJhZ2VudHMiOltdLCJleHAiOjE4MDAwMDAyOTAsImlhdCI6MTc5OTk5OTk5MCwiaXNzIjoiZXZpbCIsImp0aXMiOltdLCJzZXEiOjEsInVzZXJzIjpbXX0.TPWztJLwApqCRBJnkgYeE87pt9V7XezQBaDpMOrv-GvEwL9Cnr9Ha0lahMWjX6eSwOnhf_MjYIXh2NqGpDc7Dw",
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.hlwhZ-7wmh2BE4cffBQZauuqd4IS1GAeLPvN1t5MPYTI1EG_iqyQ_lLpvybbna7h6pQv09Rh6GHmuHQdk9oeCw",
+   "why": "bulletin issuer must be delcred"
+  },
+  {
+   "expect": [
+    "revocation_data_invalid"
+   ],
+   "name": "bulletin_garbage",
+   "request": {
+    "bulletin": "not.a.jws",
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.hlwhZ-7wmh2BE4cffBQZauuqd4IS1GAeLPvN1t5MPYTI1EG_iqyQ_lLpvybbna7h6pQv09Rh6GHmuHQdk9oeCw",
+   "why": "unparseable bulletin fails closed"
+  },
+  {
+   "expect": [
+    "revocation_data_invalid"
+   ],
+   "name": "bulletin_required_but_absent",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": true,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.hlwhZ-7wmh2BE4cffBQZauuqd4IS1GAeLPvN1t5MPYTI1EG_iqyQ_lLpvybbna7h6pQv09Rh6GHmuHQdk9oeCw",
+   "why": "verifier policy: fresh bulletin mandatory"
+  },
+  {
+   "expect": [
+    "wrong_audience"
+   ],
+   "name": "bulletin_not_checked_after_other_failure",
+   "request": {
+    "bulletin": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJkZWxjcmVkLXJlditqd3QifQ.eyJhZ2VudHMiOltdLCJleHAiOjE4MDAwMDAyOTAsImlhdCI6MTc5OTk5OTk5MCwiaXNzIjoiZGVsY3JlZCIsImp0aXMiOltdLCJzZXEiOjEsInVzZXJzIjpbXX0.DIvIliapPEKkwznBro2ChXMT3w31846qHwuR_IjNmNZDb1N4lhSwF0EBkN6o3FC3fQnJOYKEwcOvdU7NsKcoDw",
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://other.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.hlwhZ-7wmh2BE4cffBQZauuqd4IS1GAeLPvN1t5MPYTI1EG_iqyQ_lLpvybbna7h6pQv09Rh6GHmuHQdk9oeCw",
+   "why": "an earlier failure code is reported first"
+  },
+  {
+   "expect": [
+    "ok"
+   ],
+   "name": "dpop_valid",
+   "request": {
+    "bulletin": null,
+    "dpop": {
+     "method": "GET",
+     "proof": "eyJhbGciOiJFZERTQSIsImp3ayI6eyJjcnYiOiJFZDI1NTE5Iiwia3R5IjoiT0tQIiwieCI6Iml3c2Q0NmZzNVNFWmxDNm9LcC1ma2FuUk91OFhteHZ2ZzFQOXVTc2c3VzgifSwidHlwIjoiZHBvcCtqd3QifQ.eyJhdGgiOiJMR2NjVF9rWDR0eUVkX1FveWJtXzZWNGRpRXJJeWRSV2ZwUl9DaUJiSGZnIiwiaHRtIjoiR0VUIiwiaHR1IjoiaHR0cHM6Ly9hcGkuYWNtZS50ZXN0L3YxL2ludm9pY2VzIiwiaWF0IjoxODAwMDAwMDAwLCJqdGkiOiJwcm9vZi0wMDAxIn0.tH05xiPelYBLt3EbPoedcwsLTndo-rRVuW1RLGlXIhk-tAjRVeLLtLbABbG2Iv9QNTunbeB-AA_5U2H2QDvLAg",
+     "url": "https://api.acme.test/v1/invoices"
+    },
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJjbmYiOnsiamt0IjoiUEMwbXNQSTY1QkJ2VUVXZUN1SVlkQjc0REhkS3dkZHNpYzdQUHFwUG1JSSJ9LCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS1ib3VuZCIsImtpbmQiOiJkZWxlZ2F0aW9uIiwibmJmIjoxNzk5OTk5OTQwLCJzY29wZSI6ImN1c3RvbWVyczpyZWFkIGludm9pY2VzOnJlYWQiLCJzdWIiOiJ1X2FsaWNlIiwidXNlcl9pc3MiOiJkZWxjcmVkIn0.UA09D6YRwJkCrfUQkQ43nL5cIiJ8ensKSIZohHtj8sk37KILT1JzbPAVnyANY69TfTXO6zrdHTplxVLbXd4NBA",
+   "why": "bound token + matching proof"
+  },
+  {
+   "expect": [
+    "ok"
+   ],
+   "name": "dpop_valid_default_port_and_query",
+   "request": {
+    "bulletin": null,
+    "dpop": {
+     "method": "GET",
+     "proof": "eyJhbGciOiJFZERTQSIsImp3ayI6eyJjcnYiOiJFZDI1NTE5Iiwia3R5IjoiT0tQIiwieCI6Iml3c2Q0NmZzNVNFWmxDNm9LcC1ma2FuUk91OFhteHZ2ZzFQOXVTc2c3VzgifSwidHlwIjoiZHBvcCtqd3QifQ.eyJhdGgiOiJMR2NjVF9rWDR0eUVkX1FveWJtXzZWNGRpRXJJeWRSV2ZwUl9DaUJiSGZnIiwiaHRtIjoiR0VUIiwiaHR1IjoiSFRUUFM6Ly9BUEkuQUNNRS5URVNUOjQ0My92MS9pbnZvaWNlcyIsImlhdCI6MTgwMDAwMDAwMCwianRpIjoicHJvb2YtMDAwMSJ9.aAWe0UpezsvUsTZvGazMSgoVCCjxBIXwylHbaMRlYQMC6KUBbmvUXLHIFeOu5Cxie4F8m6eVKzMqMkflENNRCA",
+     "url": "https://api.acme.test/v1/invoices?limit=5#x"
+    },
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJjbmYiOnsiamt0IjoiUEMwbXNQSTY1QkJ2VUVXZUN1SVlkQjc0REhkS3dkZHNpYzdQUHFwUG1JSSJ9LCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS1ib3VuZCIsImtpbmQiOiJkZWxlZ2F0aW9uIiwibmJmIjoxNzk5OTk5OTQwLCJzY29wZSI6ImN1c3RvbWVyczpyZWFkIGludm9pY2VzOnJlYWQiLCJzdWIiOiJ1X2FsaWNlIiwidXNlcl9pc3MiOiJkZWxjcmVkIn0.UA09D6YRwJkCrfUQkQ43nL5cIiJ8ensKSIZohHtj8sk37KILT1JzbPAVnyANY69TfTXO6zrdHTplxVLbXd4NBA",
+   "why": "htu compared without query/fragment, case-insensitive host, default port dropped"
+  },
+  {
+   "expect": [
+    "dpop_required"
+   ],
+   "name": "dpop_missing",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJjbmYiOnsiamt0IjoiUEMwbXNQSTY1QkJ2VUVXZUN1SVlkQjc0REhkS3dkZHNpYzdQUHFwUG1JSSJ9LCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS1ib3VuZCIsImtpbmQiOiJkZWxlZ2F0aW9uIiwibmJmIjoxNzk5OTk5OTQwLCJzY29wZSI6ImN1c3RvbWVyczpyZWFkIGludm9pY2VzOnJlYWQiLCJzdWIiOiJ1X2FsaWNlIiwidXNlcl9pc3MiOiJkZWxjcmVkIn0.UA09D6YRwJkCrfUQkQ43nL5cIiJ8ensKSIZohHtj8sk37KILT1JzbPAVnyANY69TfTXO6zrdHTplxVLbXd4NBA",
+   "why": "sender-constrained token without a proof"
+  },
+  {
+   "expect": [
+    "invalid_dpop_proof"
+   ],
+   "name": "dpop_method_mismatch",
+   "request": {
+    "bulletin": null,
+    "dpop": {
+     "method": "GET",
+     "proof": "eyJhbGciOiJFZERTQSIsImp3ayI6eyJjcnYiOiJFZDI1NTE5Iiwia3R5IjoiT0tQIiwieCI6Iml3c2Q0NmZzNVNFWmxDNm9LcC1ma2FuUk91OFhteHZ2ZzFQOXVTc2c3VzgifSwidHlwIjoiZHBvcCtqd3QifQ.eyJhdGgiOiJMR2NjVF9rWDR0eUVkX1FveWJtXzZWNGRpRXJJeWRSV2ZwUl9DaUJiSGZnIiwiaHRtIjoiUE9TVCIsImh0dSI6Imh0dHBzOi8vYXBpLmFjbWUudGVzdC92MS9pbnZvaWNlcyIsImlhdCI6MTgwMDAwMDAwMCwianRpIjoicHJvb2YtMDAwMSJ9._sDOQPdpDaDB0pZbOp-zC3QP4K_IL49vbjESPPoSaquxAnUJVxvmss-sD34Gzvx_BMyh9-lQ1TPfGyJkOpJuBw",
+     "url": "https://api.acme.test/v1/invoices"
+    },
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJjbmYiOnsiamt0IjoiUEMwbXNQSTY1QkJ2VUVXZUN1SVlkQjc0REhkS3dkZHNpYzdQUHFwUG1JSSJ9LCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS1ib3VuZCIsImtpbmQiOiJkZWxlZ2F0aW9uIiwibmJmIjoxNzk5OTk5OTQwLCJzY29wZSI6ImN1c3RvbWVyczpyZWFkIGludm9pY2VzOnJlYWQiLCJzdWIiOiJ1X2FsaWNlIiwidXNlcl9pc3MiOiJkZWxjcmVkIn0.UA09D6YRwJkCrfUQkQ43nL5cIiJ8ensKSIZohHtj8sk37KILT1JzbPAVnyANY69TfTXO6zrdHTplxVLbXd4NBA",
+   "why": "htm differs from request"
+  },
+  {
+   "expect": [
+    "invalid_dpop_proof"
+   ],
+   "name": "dpop_url_mismatch",
+   "request": {
+    "bulletin": null,
+    "dpop": {
+     "method": "GET",
+     "proof": "eyJhbGciOiJFZERTQSIsImp3ayI6eyJjcnYiOiJFZDI1NTE5Iiwia3R5IjoiT0tQIiwieCI6Iml3c2Q0NmZzNVNFWmxDNm9LcC1ma2FuUk91OFhteHZ2ZzFQOXVTc2c3VzgifSwidHlwIjoiZHBvcCtqd3QifQ.eyJhdGgiOiJMR2NjVF9rWDR0eUVkX1FveWJtXzZWNGRpRXJJeWRSV2ZwUl9DaUJiSGZnIiwiaHRtIjoiR0VUIiwiaHR1IjoiaHR0cHM6Ly9hcGkuYWNtZS50ZXN0L3YxL2N1c3RvbWVycyIsImlhdCI6MTgwMDAwMDAwMCwianRpIjoicHJvb2YtMDAwMSJ9.6FTi7Tl8NPXwF94r26yr6k_qkrLm5xHn3ZLf3SN-Avm8wgNQn13WMLe54VtLjgsy7AJUvptZWFj8R8cj1Cp6Ag",
+     "url": "https://api.acme.test/v1/invoices"
+    },
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJjbmYiOnsiamt0IjoiUEMwbXNQSTY1QkJ2VUVXZUN1SVlkQjc0REhkS3dkZHNpYzdQUHFwUG1JSSJ9LCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS1ib3VuZCIsImtpbmQiOiJkZWxlZ2F0aW9uIiwibmJmIjoxNzk5OTk5OTQwLCJzY29wZSI6ImN1c3RvbWVyczpyZWFkIGludm9pY2VzOnJlYWQiLCJzdWIiOiJ1X2FsaWNlIiwidXNlcl9pc3MiOiJkZWxjcmVkIn0.UA09D6YRwJkCrfUQkQ43nL5cIiJ8ensKSIZohHtj8sk37KILT1JzbPAVnyANY69TfTXO6zrdHTplxVLbXd4NBA",
+   "why": "htu differs from request"
+  },
+  {
+   "expect": [
+    "invalid_dpop_proof"
+   ],
+   "name": "dpop_wrong_ath",
+   "request": {
+    "bulletin": null,
+    "dpop": {
+     "method": "GET",
+     "proof": "eyJhbGciOiJFZERTQSIsImp3ayI6eyJjcnYiOiJFZDI1NTE5Iiwia3R5IjoiT0tQIiwieCI6Iml3c2Q0NmZzNVNFWmxDNm9LcC1ma2FuUk91OFhteHZ2ZzFQOXVTc2c3VzgifSwidHlwIjoiZHBvcCtqd3QifQ.eyJhdGgiOiJHRFFSaFlRSk9RMkxzcEg0M0l2N014ZGxnTGZLY25wejlSRDNSZWpGekg4IiwiaHRtIjoiR0VUIiwiaHR1IjoiaHR0cHM6Ly9hcGkuYWNtZS50ZXN0L3YxL2ludm9pY2VzIiwiaWF0IjoxODAwMDAwMDAwLCJqdGkiOiJwcm9vZi0wMDAxIn0.kKH6mvpfZupJ3dl0LMnJYrOfy2rczQz_YiX6Ds1Ad5N7IzTo0_Eedq5SdabrGbex1sY90f6wX0PNVRk1zuQlBQ",
+     "url": "https://api.acme.test/v1/invoices"
+    },
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJjbmYiOnsiamt0IjoiUEMwbXNQSTY1QkJ2VUVXZUN1SVlkQjc0REhkS3dkZHNpYzdQUHFwUG1JSSJ9LCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS1ib3VuZCIsImtpbmQiOiJkZWxlZ2F0aW9uIiwibmJmIjoxNzk5OTk5OTQwLCJzY29wZSI6ImN1c3RvbWVyczpyZWFkIGludm9pY2VzOnJlYWQiLCJzdWIiOiJ1X2FsaWNlIiwidXNlcl9pc3MiOiJkZWxjcmVkIn0.UA09D6YRwJkCrfUQkQ43nL5cIiJ8ensKSIZohHtj8sk37KILT1JzbPAVnyANY69TfTXO6zrdHTplxVLbXd4NBA",
+   "why": "proof is for a different token"
+  },
+  {
+   "expect": [
+    "invalid_dpop_proof"
+   ],
+   "name": "dpop_no_ath",
+   "request": {
+    "bulletin": null,
+    "dpop": {
+     "method": "GET",
+     "proof": "eyJhbGciOiJFZERTQSIsImp3ayI6eyJjcnYiOiJFZDI1NTE5Iiwia3R5IjoiT0tQIiwieCI6Iml3c2Q0NmZzNVNFWmxDNm9LcC1ma2FuUk91OFhteHZ2ZzFQOXVTc2c3VzgifSwidHlwIjoiZHBvcCtqd3QifQ.eyJodG0iOiJHRVQiLCJodHUiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEvaW52b2ljZXMiLCJpYXQiOjE4MDAwMDAwMDAsImp0aSI6InByb29mLTAwMDEifQ.xLsg70lkMCO7MEuQgkbMq5-8Gid5ly0mwQFQyfrxVDB8iPk8pKHsmJoKqnAMlzEqNh43wILcz4boyTgGhFswAg",
+     "url": "https://api.acme.test/v1/invoices"
+    },
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJjbmYiOnsiamt0IjoiUEMwbXNQSTY1QkJ2VUVXZUN1SVlkQjc0REhkS3dkZHNpYzdQUHFwUG1JSSJ9LCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS1ib3VuZCIsImtpbmQiOiJkZWxlZ2F0aW9uIiwibmJmIjoxNzk5OTk5OTQwLCJzY29wZSI6ImN1c3RvbWVyczpyZWFkIGludm9pY2VzOnJlYWQiLCJzdWIiOiJ1X2FsaWNlIiwidXNlcl9pc3MiOiJkZWxjcmVkIn0.UA09D6YRwJkCrfUQkQ43nL5cIiJ8ensKSIZohHtj8sk37KILT1JzbPAVnyANY69TfTXO6zrdHTplxVLbXd4NBA",
+   "why": "ath required with an access token"
+  },
+  {
+   "expect": [
+    "invalid_dpop_proof"
+   ],
+   "name": "dpop_wrong_key",
+   "request": {
+    "bulletin": null,
+    "dpop": {
+     "method": "GET",
+     "proof": "eyJhbGciOiJFZERTQSIsImp3ayI6eyJjcnYiOiJFZDI1NTE5Iiwia3R5IjoiT0tQIiwieCI6IlR1SHlEOFQ1b2t1el9oWjY1Mk13SmxpNHZHR2hvTXZBUkVNZnpFTng1VEUifSwidHlwIjoiZHBvcCtqd3QifQ.eyJhdGgiOiJMR2NjVF9rWDR0eUVkX1FveWJtXzZWNGRpRXJJeWRSV2ZwUl9DaUJiSGZnIiwiaHRtIjoiR0VUIiwiaHR1IjoiaHR0cHM6Ly9hcGkuYWNtZS50ZXN0L3YxL2ludm9pY2VzIiwiaWF0IjoxODAwMDAwMDAwLCJqdGkiOiJwcm9vZi0wMDAxIn0.hajuTlkUjwbCDILaLzwu_V7X4EpU5z4Q3IcgSYjUt_hmLltEqrT1gDnRdd8xFUbyCXz5vz1n9KfThhQpkh2tAg",
+     "url": "https://api.acme.test/v1/invoices"
+    },
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJjbmYiOnsiamt0IjoiUEMwbXNQSTY1QkJ2VUVXZUN1SVlkQjc0REhkS3dkZHNpYzdQUHFwUG1JSSJ9LCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS1ib3VuZCIsImtpbmQiOiJkZWxlZ2F0aW9uIiwibmJmIjoxNzk5OTk5OTQwLCJzY29wZSI6ImN1c3RvbWVyczpyZWFkIGludm9pY2VzOnJlYWQiLCJzdWIiOiJ1X2FsaWNlIiwidXNlcl9pc3MiOiJkZWxjcmVkIn0.UA09D6YRwJkCrfUQkQ43nL5cIiJ8ensKSIZohHtj8sk37KILT1JzbPAVnyANY69TfTXO6zrdHTplxVLbXd4NBA",
+   "why": "proof key is not the one in cnf.jkt (stolen token)"
+  },
+  {
+   "expect": [
+    "invalid_dpop_proof"
+   ],
+   "name": "dpop_stale",
+   "request": {
+    "bulletin": null,
+    "dpop": {
+     "method": "GET",
+     "proof": "eyJhbGciOiJFZERTQSIsImp3ayI6eyJjcnYiOiJFZDI1NTE5Iiwia3R5IjoiT0tQIiwieCI6Iml3c2Q0NmZzNVNFWmxDNm9LcC1ma2FuUk91OFhteHZ2ZzFQOXVTc2c3VzgifSwidHlwIjoiZHBvcCtqd3QifQ.eyJhdGgiOiJMR2NjVF9rWDR0eUVkX1FveWJtXzZWNGRpRXJJeWRSV2ZwUl9DaUJiSGZnIiwiaHRtIjoiR0VUIiwiaHR1IjoiaHR0cHM6Ly9hcGkuYWNtZS50ZXN0L3YxL2ludm9pY2VzIiwiaWF0IjoxNzk5OTk5ODc5LCJqdGkiOiJwcm9vZi0wMDAxIn0.2Xz3ErEwtlPoTyJR-VdVz3riccG-S8MchHLeIZ1EVaGabWWWuaSX6j92xHYkdCOtONdHxtTwhZEvmA058nNdAg",
+     "url": "https://api.acme.test/v1/invoices"
+    },
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJjbmYiOnsiamt0IjoiUEMwbXNQSTY1QkJ2VUVXZUN1SVlkQjc0REhkS3dkZHNpYzdQUHFwUG1JSSJ9LCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS1ib3VuZCIsImtpbmQiOiJkZWxlZ2F0aW9uIiwibmJmIjoxNzk5OTk5OTQwLCJzY29wZSI6ImN1c3RvbWVyczpyZWFkIGludm9pY2VzOnJlYWQiLCJzdWIiOiJ1X2FsaWNlIiwidXNlcl9pc3MiOiJkZWxjcmVkIn0.UA09D6YRwJkCrfUQkQ43nL5cIiJ8ensKSIZohHtj8sk37KILT1JzbPAVnyANY69TfTXO6zrdHTplxVLbXd4NBA",
+   "why": "iat older than 120 s"
+  },
+  {
+   "expect": [
+    "invalid_dpop_proof"
+   ],
+   "name": "dpop_future",
+   "request": {
+    "bulletin": null,
+    "dpop": {
+     "method": "GET",
+     "proof": "eyJhbGciOiJFZERTQSIsImp3ayI6eyJjcnYiOiJFZDI1NTE5Iiwia3R5IjoiT0tQIiwieCI6Iml3c2Q0NmZzNVNFWmxDNm9LcC1ma2FuUk91OFhteHZ2ZzFQOXVTc2c3VzgifSwidHlwIjoiZHBvcCtqd3QifQ.eyJhdGgiOiJMR2NjVF9rWDR0eUVkX1FveWJtXzZWNGRpRXJJeWRSV2ZwUl9DaUJiSGZnIiwiaHRtIjoiR0VUIiwiaHR1IjoiaHR0cHM6Ly9hcGkuYWNtZS50ZXN0L3YxL2ludm9pY2VzIiwiaWF0IjoxODAwMDAwMDYxLCJqdGkiOiJwcm9vZi0wMDAxIn0.E-LGMNyuqVJ9mZBn1Yx4PuW3o5_ZebDJ75MQqO0zrnPscQiWH7X9BIL48qDXDi25e5QsyyLrGOv3oyysmC9YAA",
+     "url": "https://api.acme.test/v1/invoices"
+    },
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJjbmYiOnsiamt0IjoiUEMwbXNQSTY1QkJ2VUVXZUN1SVlkQjc0REhkS3dkZHNpYzdQUHFwUG1JSSJ9LCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS1ib3VuZCIsImtpbmQiOiJkZWxlZ2F0aW9uIiwibmJmIjoxNzk5OTk5OTQwLCJzY29wZSI6ImN1c3RvbWVyczpyZWFkIGludm9pY2VzOnJlYWQiLCJzdWIiOiJ1X2FsaWNlIiwidXNlcl9pc3MiOiJkZWxjcmVkIn0.UA09D6YRwJkCrfUQkQ43nL5cIiJ8ensKSIZohHtj8sk37KILT1JzbPAVnyANY69TfTXO6zrdHTplxVLbXd4NBA",
+   "why": "iat more than 60 s ahead"
+  },
+  {
+   "expect": [
+    "ok"
+   ],
+   "name": "dpop_window_edge_ok",
+   "request": {
+    "bulletin": null,
+    "dpop": {
+     "method": "GET",
+     "proof": "eyJhbGciOiJFZERTQSIsImp3ayI6eyJjcnYiOiJFZDI1NTE5Iiwia3R5IjoiT0tQIiwieCI6Iml3c2Q0NmZzNVNFWmxDNm9LcC1ma2FuUk91OFhteHZ2ZzFQOXVTc2c3VzgifSwidHlwIjoiZHBvcCtqd3QifQ.eyJhdGgiOiJMR2NjVF9rWDR0eUVkX1FveWJtXzZWNGRpRXJJeWRSV2ZwUl9DaUJiSGZnIiwiaHRtIjoiR0VUIiwiaHR1IjoiaHR0cHM6Ly9hcGkuYWNtZS50ZXN0L3YxL2ludm9pY2VzIiwiaWF0IjoxNzk5OTk5ODgwLCJqdGkiOiJwcm9vZi0wMDAxIn0.Uf_hchtREblHSu8edKzOt4Jk3T2LTFJBmVbt4OvtVEguApUaGzLC0Wd71Cvf4-wIZ1P9okbjqRXBbZlHV7GGDA",
+     "url": "https://api.acme.test/v1/invoices"
+    },
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJjbmYiOnsiamt0IjoiUEMwbXNQSTY1QkJ2VUVXZUN1SVlkQjc0REhkS3dkZHNpYzdQUHFwUG1JSSJ9LCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS1ib3VuZCIsImtpbmQiOiJkZWxlZ2F0aW9uIiwibmJmIjoxNzk5OTk5OTQwLCJzY29wZSI6ImN1c3RvbWVyczpyZWFkIGludm9pY2VzOnJlYWQiLCJzdWIiOiJ1X2FsaWNlIiwidXNlcl9pc3MiOiJkZWxjcmVkIn0.UA09D6YRwJkCrfUQkQ43nL5cIiJ8ensKSIZohHtj8sk37KILT1JzbPAVnyANY69TfTXO6zrdHTplxVLbXd4NBA",
+   "why": "iat exactly 120 s old"
+  },
+  {
+   "expect": [
+    "invalid_dpop_proof"
+   ],
+   "name": "dpop_wrong_typ",
+   "request": {
+    "bulletin": null,
+    "dpop": {
+     "method": "GET",
+     "proof": "eyJhbGciOiJFZERTQSIsImp3ayI6eyJjcnYiOiJFZDI1NTE5Iiwia3R5IjoiT0tQIiwieCI6Iml3c2Q0NmZzNVNFWmxDNm9LcC1ma2FuUk91OFhteHZ2ZzFQOXVTc2c3VzgifSwidHlwIjoiSldUIn0.eyJhdGgiOiJMR2NjVF9rWDR0eUVkX1FveWJtXzZWNGRpRXJJeWRSV2ZwUl9DaUJiSGZnIiwiaHRtIjoiR0VUIiwiaHR1IjoiaHR0cHM6Ly9hcGkuYWNtZS50ZXN0L3YxL2ludm9pY2VzIiwiaWF0IjoxODAwMDAwMDAwLCJqdGkiOiJwcm9vZi0wMDAxIn0.8-QZMKYljAliXIZqgddiHqdqurfet_NkeFbGqg5qD98WBVJzzeMq6bft4farP3WjmTHFFsz1Ssi9kupgGYkUBA",
+     "url": "https://api.acme.test/v1/invoices"
+    },
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJjbmYiOnsiamt0IjoiUEMwbXNQSTY1QkJ2VUVXZUN1SVlkQjc0REhkS3dkZHNpYzdQUHFwUG1JSSJ9LCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS1ib3VuZCIsImtpbmQiOiJkZWxlZ2F0aW9uIiwibmJmIjoxNzk5OTk5OTQwLCJzY29wZSI6ImN1c3RvbWVyczpyZWFkIGludm9pY2VzOnJlYWQiLCJzdWIiOiJ1X2FsaWNlIiwidXNlcl9pc3MiOiJkZWxjcmVkIn0.UA09D6YRwJkCrfUQkQ43nL5cIiJ8ensKSIZohHtj8sk37KILT1JzbPAVnyANY69TfTXO6zrdHTplxVLbXd4NBA",
+   "why": "proof typ must be dpop+jwt"
+  },
+  {
+   "expect": [
+    "ok",
+    "invalid_dpop_proof"
+   ],
+   "name": "dpop_replay",
+   "request": {
+    "bulletin": null,
+    "dpop": {
+     "method": "GET",
+     "proof": "eyJhbGciOiJFZERTQSIsImp3ayI6eyJjcnYiOiJFZDI1NTE5Iiwia3R5IjoiT0tQIiwieCI6Iml3c2Q0NmZzNVNFWmxDNm9LcC1ma2FuUk91OFhteHZ2ZzFQOXVTc2c3VzgifSwidHlwIjoiZHBvcCtqd3QifQ.eyJhdGgiOiJMR2NjVF9rWDR0eUVkX1FveWJtXzZWNGRpRXJJeWRSV2ZwUl9DaUJiSGZnIiwiaHRtIjoiR0VUIiwiaHR1IjoiaHR0cHM6Ly9hcGkuYWNtZS50ZXN0L3YxL2ludm9pY2VzIiwiaWF0IjoxODAwMDAwMDAwLCJqdGkiOiJyZXBsYXllZCJ9.MZPrh3nu5X_N7J2vwXFzO0EO9Bs3G4amCj-Gwx6ASCORZbQTSbzzxcQgq2tSBcq64eiB8dH3hmzRJyyDoICrCA",
+     "url": "https://api.acme.test/v1/invoices"
+    },
+    "now": 1800000000,
+    "repeat": 2,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJjbmYiOnsiamt0IjoiUEMwbXNQSTY1QkJ2VUVXZUN1SVlkQjc0REhkS3dkZHNpYzdQUHFwUG1JSSJ9LCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS1ib3VuZCIsImtpbmQiOiJkZWxlZ2F0aW9uIiwibmJmIjoxNzk5OTk5OTQwLCJzY29wZSI6ImN1c3RvbWVyczpyZWFkIGludm9pY2VzOnJlYWQiLCJzdWIiOiJ1X2FsaWNlIiwidXNlcl9pc3MiOiJkZWxjcmVkIn0.UA09D6YRwJkCrfUQkQ43nL5cIiJ8ensKSIZohHtj8sk37KILT1JzbPAVnyANY69TfTXO6zrdHTplxVLbXd4NBA",
+   "why": "same proof twice"
+  },
+  {
+   "expect": [
+    "invalid_dpop_proof"
+   ],
+   "name": "dpop_garbage",
+   "request": {
+    "bulletin": null,
+    "dpop": {
+     "method": "GET",
+     "proof": "x.y.z",
+     "url": "https://api.acme.test/v1/invoices"
+    },
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJjbmYiOnsiamt0IjoiUEMwbXNQSTY1QkJ2VUVXZUN1SVlkQjc0REhkS3dkZHNpYzdQUHFwUG1JSSJ9LCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS1ib3VuZCIsImtpbmQiOiJkZWxlZ2F0aW9uIiwibmJmIjoxNzk5OTk5OTQwLCJzY29wZSI6ImN1c3RvbWVyczpyZWFkIGludm9pY2VzOnJlYWQiLCJzdWIiOiJ1X2FsaWNlIiwidXNlcl9pc3MiOiJkZWxjcmVkIn0.UA09D6YRwJkCrfUQkQ43nL5cIiJ8ensKSIZohHtj8sk37KILT1JzbPAVnyANY69TfTXO6zrdHTplxVLbXd4NBA",
+   "why": "unparseable proof"
+  },
+  {
+   "expect": [
+    "ok"
+   ],
+   "name": "dpop_ignored_for_unbound_token",
+   "request": {
+    "bulletin": null,
+    "dpop": {
+     "method": "GET",
+     "proof": "eyJhbGciOiJFZERTQSIsImp3ayI6eyJjcnYiOiJFZDI1NTE5Iiwia3R5IjoiT0tQIiwieCI6Iml3c2Q0NmZzNVNFWmxDNm9LcC1ma2FuUk91OFhteHZ2ZzFQOXVTc2c3VzgifSwidHlwIjoiZHBvcCtqd3QifQ.eyJhdGgiOiJxYXk3c0tBSWl6SUdCS2FIWko3amJNb1JTQjNXcVZKVzJXOUhaQ2ZuNTVNIiwiaHRtIjoiR0VUIiwiaHR1IjoiaHR0cHM6Ly9hcGkuYWNtZS50ZXN0L3YxL2ludm9pY2VzIiwiaWF0IjoxODAwMDAwMDAwLCJqdGkiOiJwcm9vZi0wMDAxIn0.6LGHtqcMJXDwYweiGHcaV85R4SLDGdH5zZXTGiHD0eHq1bVpkFJRPSewSK1l4Grjxbkr64DBqa_LOVdDg44eBg",
+     "url": "https://api.acme.test/v1/invoices"
+    },
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.hlwhZ-7wmh2BE4cffBQZauuqd4IS1GAeLPvN1t5MPYTI1EG_iqyQ_lLpvybbna7h6pQv09Rh6GHmuHQdk9oeCw",
+   "why": "a proof on an unbound token is ignored"
+  }
+ ],
+ "dpop_client_thumbprint": "PC0msPI65BBvUEWeCuIYdB74DHdKwddsic7PPqpPmII",
+ "issuer": "delcred",
+ "jwks": {
+  "keys": [
+   {
+    "alg": "EdDSA",
+    "crv": "Ed25519",
+    "kid": "GYuT9qOZ_jwg3GsCB2dQkWKGmegRSxA_CIvxuU49USo",
+    "kty": "OKP",
+    "use": "sig",
+    "x": "EeSlut2rx8UZjYdMaqb-9_oZ6t3clSqX9HhBC3ZSbfs"
+   }
+  ]
+ },
+ "leeway_seconds": 60,
+ "resource": "https://api.acme.test/v1",
+ "spec_version": 1
+}

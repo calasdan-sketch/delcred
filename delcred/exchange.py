@@ -15,12 +15,21 @@ naming both, revocable independently.
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from . import pop as _pop
 from . import tokens
-from ._common import DEFAULT_TTL, home
+from ._common import (
+    DEFAULT_TTL,
+    MAX_TTL,
+    check_identifier,
+    check_ttl,
+    home,
+    parse_scope,
+)
 from .audit import AuditLog
 from .broker import Broker
 from .policy import PolicyError
@@ -60,12 +69,43 @@ def exchange(
     resource: str,
     requested_token_type: str = TOKEN_TYPE_JWT,
     ttl: int = DEFAULT_TTL,
+    dpop_jkt: str | None = None,
+    dpop_proof: str | None = None,
+    dpop_url: str | None = None,
     base: Path | None = None,
 ) -> ExchangeResult:
-    """Perform the delegation exchange. Raises ExchangeError / PolicyError."""
+    """Perform the delegation exchange. Raises ExchangeError / PolicyError.
+
+    * ``dpop_jkt`` binds the new token to a DPoP key (thumbprint, RFC 7638);
+      ``dpop_proof`` + ``dpop_url`` (the token endpoint URL) instead derives
+      it from a proof of possession (RFC 9449 §5), which is what
+      ``POST /token`` does with its ``DPoP`` header. Bound tokens are
+      useless without the key.
+    * If ``subject_token`` is itself a **delegation** token, this is a
+      sub-delegation (agent → sub-agent): the new token can only be
+      *narrower* than the parent. See :func:`_attenuate`.
+    """
     home_ = base or home()
     audit = AuditLog(home_)
     revocations = RevocationList(home_)
+    try:
+        check_ttl(ttl)
+    except ValueError as e:
+        raise PolicyError(str(e)) from e
+    if dpop_jkt is not None and dpop_proof is not None:
+        raise ExchangeError("pass dpop_jkt or dpop_proof, not both")
+    proof_jkt: str | None = None
+    if dpop_proof is not None:
+        try:
+            proof_jkt = _pop.verify_proof(
+                dpop_proof, method="POST", url=dpop_url or "", now=None
+            )
+        except _pop.PopError as e:
+            audit.record("exchange_failed", reason="bad_dpop_proof", detail=str(e))
+            raise ExchangeError(f"DPoP proof rejected: {e}") from e
+    bind_jkt = dpop_jkt or proof_jkt
+    if bind_jkt is not None and not (isinstance(bind_jkt, str) and 20 <= len(bind_jkt) <= 128):
+        raise ExchangeError("dpop_jkt must be an RFC 7638 thumbprint")
 
     # 1. Validate both input tokens (signature → issuer → expiry).
     try:
@@ -87,13 +127,34 @@ def exchange(
     #    absent/"user" and which carries a sub is treated as the user —
     #    EXCEPT it must not be one of our own agent/delegation tokens
     #    (prevents an agent laundering its own token into a subject).
-    if sub_claims.get("kind") in ("agent", "delegation"):
+    if sub_claims.get("kind") == "delegation":
+        return _attenuate(
+            parent_token=subject_token,
+            parent_claims=sub_claims,
+            child_claims=act_claims,
+            scope=scope,
+            resource=resource,
+            requested_token_type=requested_token_type,
+            ttl=ttl,
+            bind_jkt=bind_jkt,
+            proof_jkt=proof_jkt,
+            home_=home_,
+            audit=audit,
+            revocations=revocations,
+        )
+    if sub_claims.get("kind") == "agent":
         audit.record("exchange_failed", reason="subject_is_agent_token")
         raise ExchangeError("subject_token must identify a user, not an agent")
     _require_kind(act_claims, "agent", "actor")
     user = sub_claims["sub"]
     user_iss = tokens.user_issuer(sub_claims)
     agent = act_claims["sub"]
+    try:
+        check_identifier(user, "user")
+        check_identifier(agent, "agent")
+    except (ValueError, TypeError) as e:
+        audit.record("exchange_failed", reason="bad_identifier", detail=str(e)[:120])
+        raise ExchangeError(str(e)) from e
 
     # 3. Neither party may be revoked.
     for claims, role in ((sub_claims, "user"), (act_claims, "agent")):
@@ -130,11 +191,14 @@ def exchange(
         ttl=effective_ttl,
         single_use=single_use,
         user_iss=user_iss,
+        cnf_jkt=bind_jkt,
         base=home_,
     )
     claims = tokens.decode_unverified(delegation_jwt)
 
     if requested_token_type == TOKEN_TYPE_BROKER_KEY:
+        if bind_jkt:
+            raise ExchangeError("opaque API keys cannot be DPoP-bound; request a JWT")
         broker = Broker(home_)
         key = broker.issue(
             user=user,
@@ -175,12 +239,133 @@ def exchange(
     raise ExchangeError(f"unsupported requested_token_type: {requested_token_type}")
 
 
+def _attenuate(
+    *,
+    parent_token: str,
+    parent_claims: dict[str, Any],
+    child_claims: dict[str, Any],
+    scope: str,
+    resource: str,
+    requested_token_type: str,
+    ttl: int,
+    bind_jkt: str | None,
+    proof_jkt: str | None,
+    home_: Path,
+    audit: AuditLog,
+    revocations: RevocationList,
+) -> ExchangeResult:
+    """Sub-delegation: mint a token for a sub-agent that is NEVER broader.
+
+    Invariants (each one enforced here and fuzz-tested in ``bench/``):
+
+    * scope(child) ⊆ scope(parent) ∩ scope(user's *current* grant);
+    * aud(child) == aud(parent); exp(child) ≤ exp(parent);
+    * the sub-agent must be named in the grant's ``delegate_to`` and the
+      chain depth within ``max_depth`` (deny by default);
+    * the child's identity is proven by an issuer-signed agent token, so a
+      parent cannot name an agent it does not control;
+    * single-use parents cannot delegate; a DPoP-bound parent requires
+      proof of its key and the child stays bound to that key;
+    * revoking any ancestor jti, any agent in the chain, or the user kills
+      the child (see :meth:`RevocationList.is_revoked`).
+    """
+    def deny(reason: str, **kw: Any) -> None:
+        audit.record("delegation_denied", reason=reason, **kw)
+
+    if requested_token_type not in (TOKEN_TYPE_JWT, TOKEN_TYPE_ACCESS):
+        raise ExchangeError("sub-delegation can only issue JWT access tokens")
+    if child_claims.get("kind") != "agent":
+        raise ExchangeError(f"actor token has kind={child_claims.get('kind')!r}; expected 'agent'")
+    child = child_claims["sub"]
+    try:
+        check_identifier(child, "agent")
+        parse_scope(scope)
+    except (ValueError, TypeError) as e:
+        raise PolicyError(str(e), code="scope") from e
+    # The parent must be a valid delegation token for exactly this resource.
+    try:
+        parent = tokens.verify_delegation_token(parent_token, expected_resource=resource, base=home_)
+    except tokens.TokenError as e:
+        deny("bad_parent", detail=str(e)[:160])
+        raise PolicyError(f"parent delegation rejected: {e}", code="resource") from e
+    revoked, why = revocations.is_revoked(parent)
+    if revoked:
+        deny("parent_revoked", user=parent["sub"])
+        raise ExchangeError(f"parent delegation is revoked: {why}")
+    revoked, why = revocations.is_revoked(child_claims)
+    if revoked:
+        deny("child_revoked", user=parent["sub"], agent=child)
+        raise ExchangeError(f"sub-agent is revoked: {why}")
+    if parent.get("single_use"):
+        deny("parent_single_use", user=parent["sub"])
+        raise PolicyError("single-use credentials cannot be sub-delegated", code="delegation")
+    actors = tokens.actor_chain(parent)  # leaf first
+    if child in actors:
+        deny("cycle", user=parent["sub"], agent=child)
+        raise ExchangeError(
+            f"subject_token must identify a user: agent {child!r} is already in this "
+            "delegation chain (an agent cannot re-delegate to itself)"
+        )
+    parent_jkt = (parent.get("cnf") or {}).get("jkt")
+    if parent_jkt and proof_jkt != parent_jkt:
+        raise ExchangeError(
+            "the parent token is DPoP-bound: present a DPoP proof signed by its key"
+        )
+    if bind_jkt and parent_jkt and bind_jkt != parent_jkt:
+        raise ExchangeError("a sub-delegation cannot move a DPoP-bound token to another key")
+    new_jkt = parent_jkt or bind_jkt
+    user, user_iss, root = parent["sub"], tokens.user_issuer(parent), actors[-1]
+    held = set(str(parent.get("scope", "")).split())
+    policy = load_policy(home_)
+    try:
+        grant = policy.check_delegation(
+            user, root, child, held, scope, resource, ttl, depth=len(actors), issuer=user_iss
+        )
+    except PolicyError as e:
+        deny(e.code, user=user, agent=child, scope=scope, resource=resource, detail=str(e)[:160])
+        raise
+    now = int(time.time())
+    remaining = int(parent["exp"]) - now
+    effective = min(ttl, grant.max_ttl, MAX_TTL, remaining)
+    if effective <= 0:
+        raise ExchangeError("parent delegation has expired")
+    jwt_ = tokens.mint_delegation_token(
+        user=user,
+        agent=child,
+        scope=scope,
+        resource=resource,
+        ttl=effective,
+        user_iss=user_iss,
+        actors=[child, *actors],
+        chain=[*parent.get("chain", []), parent["jti"]],
+        cnf_jkt=new_jkt,
+        base=home_,
+    )
+    claims = tokens.decode_unverified(jwt_)
+    audit.record(
+        "delegation_attenuated",
+        user=user,
+        agent=child,
+        parent_agent=actors[0],
+        scope=claims["scope"],
+        resource=resource,
+        ttl=effective,
+        depth=len(actors),
+        parent_jti=parent["jti"],
+        jti=claims["jti"],
+    )
+    return ExchangeResult(requested_token_type, jwt_, claims, effective)
+
+
 def verify(
     token: str,
     *,
     expected_resource: str,
     required_scopes: str | list[str] | set[str] | None = None,
     base: Path | None = None,
+    dpop_proof: str | None = None,
+    http_method: str | None = None,
+    http_url: str | None = None,
 ) -> dict[str, Any]:
     """Full verification: signature → expiry → audience → scope → revocation.
 
@@ -192,6 +377,11 @@ def verify(
     lacking any of them raises :class:`delcred.InsufficientScope` (→ HTTP
     403 ``insufficient_scope``). Checked *before* the single-use burn, so a
     token presented for the wrong operation is not destroyed.
+
+    Tokens bound to a key (``cnf.jkt``) additionally REQUIRE ``dpop_proof``,
+    ``http_method`` and ``http_url`` (RFC 9449); the proof is checked before
+    revocation and before a single-use burn, so a thief without the key
+    cannot even consume the victim's single-use token.
 
     Single-use tokens are burned atomically on first successful verify.
     Raises tokens.TokenError or ExchangeError.
@@ -216,6 +406,24 @@ def verify(
             missing=e.missing,
         )
         raise
+    jkt = (claims.get("cnf") or {}).get("jkt")
+    if jkt:
+        if not (dpop_proof and http_method and http_url):
+            audit.record("verify_dpop_missing", jti=claims.get("jti"))
+            raise tokens.InvalidToken(
+                "token is sender-constrained (cnf.jkt): a DPoP proof, method and URL are required"
+            )
+        try:
+            _pop.verify_proof(
+                dpop_proof,
+                method=http_method,
+                url=http_url,
+                access_token=token,
+                expected_jkt=jkt,
+            )
+        except _pop.PopError as e:
+            audit.record("verify_dpop_failed", jti=claims.get("jti"), detail=str(e)[:120])
+            raise tokens.InvalidToken(f"DPoP proof rejected: {e}") from e
     revoked, why = revocations.is_revoked(claims)
     if revoked:
         audit.record(

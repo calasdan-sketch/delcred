@@ -20,6 +20,8 @@ _POLICY = f"""grants:
     scopes: ["invoices:read", "invoices:write"]
     resources: ["{RES}"]
     max_ttl: 900
+    delegate_to: [summarizer, mailer]
+    max_depth: 2
   - user: u_alice
     agent: one-shot-agent
     scopes: ["payments:create"]
@@ -97,12 +99,12 @@ def run_demo(out: Callable[[str], None] = print) -> bool:
         check("401 when no credential is sent", dec.status == 401)
 
         out("6. opaque API key (agent never sees a real secret)")
-        key = delcred.delegate_api_key(
+        apikey = delcred.delegate_api_key(
             scope="invoices:read", resource=RES, user_token=user, agent_token=agent, base=h
         )
-        cap = delcred.verify_broker_key(key, base=h, expected_resource=RES)
+        cap = delcred.verify_broker_key(apikey, base=h, expected_resource=RES)
         check("dk_ key redeems to a scoped capability", cap["scope"] == "invoices:read",
-              f"{key[:7]}… → {cap['scope']}")
+              f"{apikey[:7]}… → {cap['scope']}")
 
         out("7. single-use credentials")
         one = delcred.agent_token("one-shot-agent", base=h)
@@ -113,14 +115,52 @@ def run_demo(out: Callable[[str], None] = print) -> bool:
         ok, d = denied(lambda: delcred.verify(st, expected_resource=RES, base=h))
         check("replay of a single-use token blocked", ok, d)
 
-        out("8. kill switch")
+        out("8. sub-delegation can only narrow")
+        parent = delcred.delegate(
+            scope="invoices:read invoices:write", resource=RES, user_token=user, agent_token=agent, base=h
+        )
+        sub_id = delcred.agent_token("summarizer", base=h)
+        child = delcred.attenuate(parent, sub_agent_token=sub_id, scope="invoices:read", resource=RES, base=h)
+        cc = delcred.verify(child, expected_resource=RES, base=h)
+        check("sub-agent gets a narrower copy; chain recorded", cc["act"]["act"]["sub"] == "billing-agent",
+              f"scope={cc['scope']!r}")
+        ok, d = denied(lambda: delcred.attenuate(
+            child, sub_agent_token=delcred.agent_token("mailer", base=h),
+            scope="invoices:write", resource=RES, base=h))
+        check("a child can never regain what it was not given", ok, d)
+
+        out("9. stolen-token defence (DPoP, RFC 9449)")
+        from delcred import pop
+        key = pop.generate_key()
+        bound = delcred.delegate(
+            scope="invoices:read", resource=RES, user_token=user, agent_token=agent,
+            dpop_jkt=pop.thumbprint(key), base=h)
+        url = RES + "/invoices"
+        ok, d = denied(lambda: delcred.verify(bound, expected_resource=RES, base=h))
+        check("key-bound token is useless as a plain bearer token", ok, d)
+        delcred.verify(bound, expected_resource=RES, base=h, http_method="GET", http_url=url,
+                       dpop_proof=pop.make_proof(key, "GET", url, access_token=bound))
+        check("…and works with a proof from its key", True)
+
+        out("10. third parties verify offline (JWKS + signed revocation bulletin)")
+        jwks = delcred.jwks(base=h)
+        v = delcred.offline.verify_offline(tok, jwks=jwks, resource=RES,
+                                           bulletin=delcred.bulletin.export(h))
+        check("a resource server with no delcred home accepts it", v.ok, v.code)
+
+        out("11. kill switch")
         delcred.revoke_agent("billing-agent", reason="demo: suspected prompt injection", base=h)
         ok, d = denied(lambda: delcred.verify(tok, expected_resource=RES, base=h))
         check("revoked agent's token dies instantly", ok, d)
-        ok, _ = denied(lambda: delcred.verify_broker_key(key, base=h, expected_resource=RES))
+        ok, _ = denied(lambda: delcred.verify_broker_key(apikey, base=h, expected_resource=RES))
         check("…and so does its API key", ok)
+        ok, d = denied(lambda: delcred.verify(child, expected_resource=RES, base=h))
+        check("…and every sub-agent token below it", ok, d)
+        v = delcred.offline.verify_offline(tok, jwks=jwks, resource=RES,
+                                           bulletin=delcred.bulletin.export(h))
+        check("…and third-party verifiers see it via the bulletin", v.code == "revoked", v.code)
 
-        out("9. tamper-evident audit trail")
+        out("12. tamper-evident audit trail")
         log = delcred.AuditLog(h)
         v = log.verify()
         check("hash chain intact", v.ok, f"{v.chained} entries, head {v.head[:12]}…")

@@ -1,5 +1,56 @@
 # Changelog
 
+## 0.4.0 - unreleased (expert-2 round)
+
+### Added
+- **Sub-delegation (agent -> sub-agent), attenuation only.** `delcred.attenuate()`,
+  or `POST /token` / `exchange()` with a delegation token as `subject_token`.
+  Grants gain `delegate_to` and `max_depth` (deny by default, hard cap 4). Child:
+  scope within the parent's and the user's current grant, same audience, `exp`
+  no later, proven sub-agent identity, no cycles, single-use parents refused.
+  `act` nests per RFC 8693 4.4; `chain` lists ancestor jtis. Revocation checks
+  every actor and ancestor in the chain (previously only the leaf agent).
+- **DPoP (RFC 9449, Ed25519):** `delcred.pop`, `delegate(dpop_jkt=)`,
+  `verify(dpop_proof=, http_method=, http_url=)`, `mcp.authorize(...)` with the
+  `DPoP` scheme and challenge, `/token` `DPoP` header. Bound tokens fail closed
+  without a proof; the proof is checked before revocation and single-use burn.
+- **Offline verifier + spec + vectors:** `delcred.offline.verify_offline`,
+  `spec/VERIFICATION.md`, 89 deterministic vectors (`delcred vectors`),
+  dependency-free Node and Go verifiers, `delcred offline-verify`.
+- **Signed revocation bulletin:** `delcred revocations export`,
+  `GET /revocations.jwt`, `delcred.bulletin`.
+- **Key rotation with overlap:** `delcred key rotate --keep-old [SECONDS]`,
+  `key retire KID`; retired keys verify but never sign and appear in the JWKS.
+- `examples/agent_loop.py`; `bench/run_bench.py` (+ `bench/results.json`);
+  `demo` now covers sub-delegation, DPoP, offline verification (20 checks).
+
+### Changed
+- **Revocation lookups are indexed** (one `stat` per check; only appended bytes
+  parsed): 173 ms -> 0.004 ms at 100,000 entries; single-use burns at 100k
+  entries 6.7/s -> ~3,500/s.
+- Tokens larger than 16 KiB are refused before parsing (a 5 MB token cost 0.45 s).
+- JWS headers `jwk jku x5u x5c x5t x5t#S256 crit` are rejected; unknown `cnf`
+  members fail closed.
+- `/.well-known/oauth-authorization-server` advertises DPoP and the bulletin URI.
+
+### Fixed
+- Non-canonical base64url (non-zero trailing bits) is rejected by the offline verifier and both reference verifiers; a differential fuzz against the PyJWT path found the two disagreeing on a flipped last signature character.
+- A crash-torn revocation line is terminated before the next append (the next
+  revocation or single-use burn was previously glued onto it and lost).
+- Scopes are parsed per RFC 6749 (ASCII space only; NBSP/tab/Unicode spaces and
+  non-token characters are rejected). Python's `split()` and other languages'
+  verifiers disagreed about such scopes.
+- `ttl` must be a positive integer (floats, bools and strings used to mint odd
+  `exp` values or raise `TypeError`).
+- User/agent ids with control, bidi, zero-width or whitespace characters are
+  refused at mint and exchange (terminal-escape injection into logs).
+
+### Compatibility
+- All 0.3 APIs and tokens keep working. A delegation token used as
+  `subject_token` previously always failed; it now works only for agents the
+  grant lists in `delegate_to`, otherwise it still fails.
+- `key rotate` without flags is still a hard cut.
+
 ## 0.3.0 — unreleased
 
 ### Added

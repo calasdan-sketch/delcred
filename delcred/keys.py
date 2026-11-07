@@ -97,9 +97,111 @@ def public_jwk(pub: Ed25519PublicKey) -> dict[str, str]:
     }
 
 
+# -- rotation with an overlap window -----------------------------------------
+#
+# A routine rotation must not kill every live token (agent identity tokens
+# live 24 h by default). ``rotate(keep_old=...)`` moves the old public key to
+# ``retired/<kid>.json`` with a deadline; until then it still VERIFIES but
+# never signs, and it is published in the JWKS so third-party verifiers keep
+# working. After a suspected compromise use a hard cut (``keep_old=0``).
+
+
+def _retired_dir(base: Path | None) -> Path:
+    return (base or home()) / "retired"
+
+
+def retired_keys(base: Path | None = None, *, now: int | None = None) -> dict[str, Ed25519PublicKey]:
+    """Retired-but-still-valid verification keys: ``{kid: public key}``."""
+    import json
+    import time
+
+    t = int(time.time()) if now is None else now
+    out: dict[str, Ed25519PublicKey] = {}
+    d = _retired_dir(base)
+    if not d.is_dir():
+        return out
+    for f in sorted(d.glob("*.json")):
+        try:
+            rec = json.loads(f.read_text())
+            if int(rec["retire_after"]) < t:
+                continue
+            pub = serialization.load_pem_public_key(rec["pem"].encode())
+            if key_id(pub) == rec["kid"] == f.stem:
+                out[rec["kid"]] = pub
+        except (OSError, KeyError, ValueError, TypeError):
+            continue  # a damaged record never widens trust
+    return out
+
+
+def rotate(base: Path | None = None, *, keep_old: int = 0):
+    """Generate a new issuer key. ``keep_old`` seconds of overlap (0 = hard cut).
+
+    Returns ``(priv, pub, retired_kid | None)``.
+    """
+    import json
+    import time
+
+    h = base or home()
+    retired_kid = None
+    if keep_old > 0:
+        try:
+            old = load_public(h)
+        except FileNotFoundError:
+            old = None
+        if old is not None:
+            retired_kid = key_id(old)
+            d = _retired_dir(h)
+            d.mkdir(mode=0o700, parents=True, exist_ok=True)
+            write_private(
+                d / f"{retired_kid}.json",
+                json.dumps(
+                    {
+                        "kid": retired_kid,
+                        "retire_after": int(time.time()) + int(keep_old),
+                        "pem": old.public_bytes(
+                            serialization.Encoding.PEM,
+                            serialization.PublicFormat.SubjectPublicKeyInfo,
+                        ).decode(),
+                    }
+                ).encode(),
+            )
+    else:
+        # Hard cut also forgets earlier overlaps: a compromised key must not survive.
+        d = _retired_dir(h)
+        if d.is_dir():
+            for f in d.glob("*.json"):
+                f.unlink(missing_ok=True)
+    priv, pub = generate(h)
+    return priv, pub, retired_kid
+
+
+def retire(kid: str, base: Path | None = None) -> bool:
+    """Stop trusting one retired key immediately. Returns True if it existed."""
+    import re
+
+    if not isinstance(kid, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", kid):
+        return False
+    f = _retired_dir(base) / f"{kid}.json"
+    if f.is_file() and f.parent.resolve() == _retired_dir(base).resolve():
+        f.unlink()
+        return True
+    return False
+
+
+def verification_keys(base: Path | None = None) -> dict[str, Ed25519PublicKey]:
+    """Every key that may verify a delcred token right now: current + retired."""
+    cur = load_public(base)
+    keys = retired_keys(base)
+    keys[key_id(cur)] = cur
+    return keys
+
+
 def jwks(base: Path | None = None) -> dict[str, list[dict[str, str]]]:
-    """JWK Set publishing the issuer's verification key (RFC 7517)."""
-    return {"keys": [public_jwk(load_public(base))]}
+    """JWK Set publishing the current (and any still-valid retired) key (RFC 7517)."""
+    cur = load_public(base)
+    out = [public_jwk(cur)]
+    out += [public_jwk(p) for k, p in retired_keys(base).items() if k != key_id(cur)]
+    return {"keys": out}
 
 
 def public_key_pem_b64url(pub: Ed25519PublicKey) -> str:

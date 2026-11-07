@@ -34,7 +34,15 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from . import keys as _keys
-from ._common import CLOCK_SKEW_LEEWAY, DEFAULT_TTL, ISSUER_ID
+from ._common import (
+    CLOCK_SKEW_LEEWAY,
+    DEFAULT_TTL,
+    ISSUER_ID,
+    MAX_CHAIN_DEPTH,
+    MAX_TOKEN_BYTES,
+    check_identifier,
+)
+from ._jws import FORBIDDEN_HEADERS
 
 
 class TokenError(Exception):
@@ -110,6 +118,9 @@ def mint_delegation_token(
     ttl: int = DEFAULT_TTL,
     single_use: bool = False,
     user_iss: str = ISSUER_ID,
+    actors: list[str] | None = None,
+    chain: list[str] | None = None,
+    cnf_jkt: str | None = None,
     base: Path | None = None,
 ) -> str:
     """Mint a delegation JWT: ``sub``=user, ``act``=agent, pinned to ``resource``.
@@ -117,16 +128,27 @@ def mint_delegation_token(
     ``user_iss`` records which issuer vouched for the user, so users are
     identified by ``(user_iss, sub)`` — ``u_1`` from an IdP is not the local
     ``u_1``.
+
+    ``actors`` (leaf first, ``actors[0] == agent``) mints a chained
+    delegation: ``act`` nests per RFC 8693 §4.4 and ``chain`` lists the
+    ancestor token ids so that revoking any ancestor kills this token.
+    ``cnf_jkt`` binds the token to a DPoP key (RFC 9449 ``cnf.jkt``).
     """
-    if not user or not agent:
-        raise ValueError("user and agent are required")
+    check_identifier(user, "user")
+    check_identifier(agent, "agent")
     if not resource:
         raise ValueError("resource (RFC 8707 indicator) is required")
+    actors = list(actors) if actors else [agent]
+    if actors[0] != agent or len(actors) > MAX_CHAIN_DEPTH + 1:
+        raise ValueError("actors must start with the agent and respect the depth cap")
     now = _now()
+    act: dict[str, Any] = {"sub": actors[-1]}
+    for a in reversed(actors[:-1]):
+        act = {"sub": a, "act": act}
     claims: dict[str, Any] = {
         "iss": ISSUER_ID,
         "sub": user,
-        "act": {"sub": agent},
+        "act": act,
         "kind": "delegation",
         "user_iss": user_iss,
         "scope": " ".join(sorted(set(scope.split()))),
@@ -138,6 +160,10 @@ def mint_delegation_token(
     }
     if single_use:
         claims["single_use"] = True
+    if chain:
+        claims["chain"] = list(chain)
+    if cnf_jkt:
+        claims["cnf"] = {"jkt": cnf_jkt}
     priv = _keys.load_private(base)
     return jwt.encode(
         claims,
@@ -149,6 +175,7 @@ def mint_delegation_token(
 
 def mint_agent_token(agent_id: str, ttl: int = 86400, base: Path | None = None) -> str:
     """Mint an agent identity token (the ``actor_token`` in an exchange)."""
+    check_identifier(agent_id, "agent id")
     now = _now()
     claims = {
         "iss": ISSUER_ID,
@@ -167,6 +194,7 @@ def mint_agent_token(agent_id: str, ttl: int = 86400, base: Path | None = None) 
 
 def mint_user_token(user_id: str, ttl: int = 3600, base: Path | None = None) -> str:
     """Mint a local user assertion (the ``subject_token`` in dev / no-IdP setups)."""
+    check_identifier(user_id, "user id")
     now = _now()
     claims = {
         "iss": ISSUER_ID,
@@ -204,6 +232,8 @@ def _key_for_issuer(
     """
     from . import trust as _trust
 
+    if not isinstance(token, str) or len(token) > MAX_TOKEN_BYTES:
+        raise InvalidToken(f"malformed token: not a string of at most {MAX_TOKEN_BYTES} bytes")
     try:
         headers = jwt.get_unverified_header(token)
     except jwt.PyJWTError as e:
@@ -212,6 +242,9 @@ def _key_for_issuer(
         raise InvalidToken(
             f"unexpected alg {headers.get('alg')!r}; only EdDSA accepted"
         )
+    for forbidden in FORBIDDEN_HEADERS:
+        if forbidden in headers:
+            raise InvalidToken(f"header parameter {forbidden!r} is not accepted")
     try:
         unverified = jwt.decode(token, options={"verify_signature": False})
     except jwt.PyJWTError as e:
@@ -223,10 +256,14 @@ def _key_for_issuer(
         pub = _keys.load_public(base)
         kid = headers.get("kid")
         if kid is not None and kid != _keys.key_id(pub):
-            raise InvalidToken(
-                "token was signed by a different issuer key (kid mismatch) — "
-                "the key was rotated or the token comes from another delcred home"
-            )
+            # Rotated with an overlap window? Retired keys still verify.
+            old = _keys.retired_keys(base).get(kid) if isinstance(kid, str) else None
+            if old is None:
+                raise InvalidToken(
+                    "token was signed by a different issuer key (kid mismatch) — "
+                    "the key was rotated or the token comes from another delcred home"
+                )
+            pub = old
         pem = pub.public_bytes(
             serialization.Encoding.PEM,
             serialization.PublicFormat.SubjectPublicKeyInfo,
@@ -318,8 +355,26 @@ def verify_delegation_token(
     claims = verify_signature(token, leeway=leeway, base=base)
     if claims.get("kind") != "delegation":
         raise InvalidToken(f"not a delegation token (kind={claims.get('kind')!r})")
-    if "act" not in claims or "sub" not in claims["act"]:
+    actors = actor_chain(claims)  # raises InvalidToken on a malformed act
+    if not actors:
         raise InvalidToken("delegation token missing act.sub (agent identity)")
+    chain = claims.get("chain", [])
+    if (
+        not isinstance(chain, list)
+        or len(chain) != len(actors) - 1
+        or not all(isinstance(j, str) and j for j in chain)
+    ):
+        raise InvalidToken("delegation token has an inconsistent actor chain")
+    if "cnf" in claims:
+        cnf = claims["cnf"]
+        if not (
+            isinstance(cnf, dict)
+            and set(cnf) == {"jkt"}
+            and isinstance(cnf["jkt"], str)
+            and cnf["jkt"]
+        ):
+            # Unknown confirmation method: we cannot enforce it, so refuse.
+            raise InvalidToken("unsupported cnf confirmation (only cnf.jkt is understood)")
     try:
         typ = str(jwt.get_unverified_header(token).get("typ", "")).lower()
     except jwt.PyJWTError as e:  # pragma: no cover - verify_signature parsed it
@@ -338,6 +393,24 @@ def verify_delegation_token(
         if missing:
             raise InsufficientScope(sorted(need), sorted(missing), sorted(have))
     return claims
+
+
+def actor_chain(claims: dict[str, Any]) -> list[str]:
+    """Acting agents, leaf (current actor) first, root (first delegatee) last.
+
+    ``act`` nests per RFC 8693 §4.4: ``{"sub": leaf, "act": {"sub": parent}}``.
+    Raises :class:`InvalidToken` for a malformed or over-deep chain.
+    """
+    out: list[str] = []
+    node: Any = claims.get("act")
+    while node is not None:
+        if not isinstance(node, dict) or not isinstance(node.get("sub"), str) or not node["sub"]:
+            raise InvalidToken("malformed act claim")
+        out.append(node["sub"])
+        if len(out) > MAX_CHAIN_DEPTH + 1:
+            raise InvalidToken("actor chain exceeds the depth cap")
+        node = node.get("act")
+    return out
 
 
 def user_issuer(claims: dict[str, Any]) -> str:

@@ -29,7 +29,7 @@ from pathlib import Path
 
 import yaml
 
-from ._common import ISSUER_ID, MAX_TTL, home
+from ._common import ISSUER_ID, MAX_CHAIN_DEPTH, MAX_TTL, check_ttl, home, parse_scope
 
 
 @dataclass
@@ -44,6 +44,11 @@ class Grant:
     # (issuer, user): a grant without ``issuer`` covers only local users,
     # never an IdP user who happens to share the id.
     issuer: str = ISSUER_ID
+    # Sub-delegation (agent -> sub-agent). Deny by default: an agent may hand
+    # a NARROWER copy of its authority only to agents listed here, at most
+    # ``max_depth`` hops deep (hard cap MAX_CHAIN_DEPTH).
+    delegate_to: set[str] = field(default_factory=set)
+    max_depth: int = 0
 
 
 @dataclass
@@ -81,12 +86,12 @@ class Policy:
             )
         if not isinstance(scope, str) or not isinstance(resource, str):
             raise PolicyError("scope and resource must be strings")
-        wanted = set(scope.split())
-        if not wanted:
-            # Finding #8: a scope-less delegation is almost certainly a
-            # caller bug; fail closed rather than mint a bearer token
-            # with no stated purpose.
-            raise PolicyError("scope must not be empty", code="scope")
+        try:
+            wanted = set(parse_scope(scope))
+        except ValueError as e:
+            # Empty scopes (finding #8) and non-RFC-6749 characters both fail
+            # closed rather than mint a bearer token with an ambiguous purpose.
+            raise PolicyError(str(e), code="scope") from e
         unknown = wanted - grant.scopes
         if unknown:
             raise PolicyError(
@@ -99,8 +104,70 @@ class Policy:
                 f"resource {resource!r} not granted (grant allows: {grant.resources})",
                 code="resource",
             )
-        if ttl <= 0:
-            raise PolicyError("ttl must be positive")
+        try:
+            check_ttl(ttl)
+        except ValueError as e:
+            raise PolicyError(str(e)) from e
+        return grant
+
+    def check_delegation(
+        self,
+        user: str,
+        root_agent: str,
+        child_agent: str,
+        parent_scopes: set[str],
+        scope: str,
+        resource: str,
+        ttl: int,
+        depth: int,
+        issuer: str = ISSUER_ID,
+    ) -> Grant:
+        """Policy gate for sub-delegation (attenuation only).
+
+        ``root_agent`` is the first agent the user's grant named; ``depth`` is
+        the hop count the new token would have (first sub-agent = 1). The
+        child may receive only scopes that are in the parent token AND still
+        in the user's current grant, on the same resource.
+        """
+        grant = self.grant_for(user, root_agent, issuer)
+        if grant is None:
+            raise PolicyError(
+                f"no delegation grant for user={user!r} agent={root_agent!r} (deny by default)",
+                code="no_grant",
+            )
+        if child_agent not in grant.delegate_to:
+            raise PolicyError(
+                f"agent {root_agent!r} is not allowed to sub-delegate to {child_agent!r} "
+                "(grant.delegate_to; deny by default)",
+                code="delegation",
+            )
+        limit = min(grant.max_depth, MAX_CHAIN_DEPTH)
+        if depth > limit:
+            raise PolicyError(
+                f"delegation depth {depth} exceeds the limit {limit} for this grant",
+                code="delegation",
+            )
+        try:
+            wanted = set(parse_scope(scope))
+        except ValueError as e:
+            raise PolicyError(str(e), code="scope") from e
+        extra = wanted - parent_scopes
+        if extra:
+            raise PolicyError(
+                f"sub-delegation may only narrow: scope(s) not held by the parent token: {sorted(extra)}",
+                code="scope",
+            )
+        gone = wanted - grant.scopes
+        if gone:
+            raise PolicyError(
+                f"scope(s) no longer granted by policy: {sorted(gone)}", code="scope"
+            )
+        if resource not in grant.resources:
+            raise PolicyError(f"resource {resource!r} not granted", code="resource")
+        try:
+            check_ttl(ttl)
+        except ValueError as e:
+            raise PolicyError(str(e)) from e
         return grant
 
     def effective_ttl(self, grant: Grant, requested_ttl: int) -> int:
@@ -143,6 +210,16 @@ grants:
 """
 
 
+def _depth(g: dict) -> int:
+    """``max_depth`` defaults to 1 when ``delegate_to`` is set, else 0 (no sub-delegation)."""
+    raw = g.get("max_depth")
+    if raw is None:
+        raw = 1 if g.get("delegate_to") else 0
+    if isinstance(raw, bool) or not isinstance(raw, int) or raw < 0:
+        raise PolicyError("max_depth must be a non-negative integer", code="request")
+    return min(raw, MAX_CHAIN_DEPTH)
+
+
 def load(base: Path | None = None) -> Policy:
     p = policy_path(base)
     if not p.exists():
@@ -159,6 +236,8 @@ def load(base: Path | None = None) -> Policy:
                 max_ttl=int(g.get("max_ttl", MAX_TTL)),
                 single_use=bool(g.get("single_use", False)),
                 issuer=str(g.get("issuer") or ISSUER_ID),
+                delegate_to={str(a) for a in (g.get("delegate_to") or [])},
+                max_depth=_depth(g),
             )
         )
     return Policy(

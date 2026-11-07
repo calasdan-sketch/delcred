@@ -17,7 +17,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from . import keys, policy, tokens
+from . import bulletin, keys, offline, policy, pop, tokens
 from ._common import DEFAULT_TTL
 from .audit import AuditLog
 from .broker import Broker
@@ -37,7 +37,7 @@ from .revocation import RevocationList
 from .tokens import ExpiredToken, InsufficientScope, InvalidToken, TokenError
 from .trust import TrustConfigError, add_trusted_issuer, trusted_issuers
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 __all__ = [
     "DEFAULT_TTL",
     "TOKEN_TYPE_BROKER_KEY",
@@ -52,10 +52,14 @@ __all__ = [
     "TrustConfigError",
     "__version__",
     "agent_token",
+    "attenuate",
+    "bulletin",
     "delegate",
     "delegate_api_key",
     "init",
     "jwks",
+    "offline",
+    "pop",
     "revoke_agent",
     "revoke_token",
     "revoke_user",
@@ -91,9 +95,14 @@ def delegate(
     user_token: str,
     agent_token: str,
     ttl: int = DEFAULT_TTL,
+    dpop_jkt: str | None = None,
     base: Path | None = None,
 ) -> str:
     """Mint a delegation JWT via RFC 8693 exchange. Returns the token.
+
+    ``dpop_jkt`` (``delcred.pop.thumbprint(key)``) binds the token to a key:
+    every use then needs a DPoP proof signed by it (RFC 9449), so a leaked
+    token is worthless on its own.
 
     ``user`` / ``agent`` are optional assertions: when given, they must match
     the identities inside ``user_token`` / ``agent_token`` or the call fails
@@ -108,6 +117,43 @@ def delegate(
         resource=resource,
         requested_token_type=TOKEN_TYPE_JWT,
         ttl=ttl,
+        dpop_jkt=dpop_jkt,
+        base=base,
+    )
+    return result.credential
+
+
+def attenuate(
+    parent_token: str,
+    *,
+    sub_agent_token: str,
+    scope: str,
+    resource: str,
+    ttl: int = DEFAULT_TTL,
+    dpop_jkt: str | None = None,
+    dpop_proof: str | None = None,
+    dpop_url: str | None = None,
+    base: Path | None = None,
+) -> str:
+    """Hand a **narrower** copy of a delegation to a sub-agent.
+
+    The result can never exceed the parent: scope ⊆ parent's, same resource,
+    expires no later, and only for agents the grant lists in ``delegate_to``
+    (``max_depth`` hops). Revoking the parent, any agent in the chain or the
+    user kills it. ``sub_agent_token`` is the sub-agent's identity token
+    (``delcred.agent_token(...)``). If the parent is DPoP-bound, pass the
+    ``dpop_proof`` (signed by its key) and the token endpoint ``dpop_url``.
+    """
+    result = _exchange(
+        subject_token=parent_token,
+        actor_token=sub_agent_token,
+        scope=scope,
+        resource=resource,
+        requested_token_type=TOKEN_TYPE_JWT,
+        ttl=ttl,
+        dpop_jkt=dpop_jkt,
+        dpop_proof=dpop_proof,
+        dpop_url=dpop_url,
         base=base,
     )
     return result.credential
@@ -162,18 +208,26 @@ def verify(
     expected_resource: str,
     required_scopes: str | list[str] | None = None,
     base: Path | None = None,
+    dpop_proof: str | None = None,
+    http_method: str | None = None,
+    http_url: str | None = None,
 ) -> dict[str, Any]:
-    """Verify a delegation JWT (signature → expiry → audience → scope → revocation).
+    """Verify a delegation JWT (signature → expiry → audience → scope → [DPoP] → revocation).
 
     ``expected_resource`` is required — audience pinning is the
     confused-deputy defense and must not be skippable. ``required_scopes``
     enforces least privilege per operation (raises ``InsufficientScope``).
+    A DPoP-bound token also needs ``dpop_proof`` / ``http_method`` /
+    ``http_url`` (see :mod:`delcred.pop`).
     """
     return _verify(
         token,
         expected_resource=expected_resource,
         required_scopes=required_scopes,
         base=base,
+        dpop_proof=dpop_proof,
+        http_method=http_method,
+        http_url=http_url,
     )
 
 

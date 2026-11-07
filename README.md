@@ -2,9 +2,12 @@
 
 **Stop giving agents your real API keys.** delcred mints short-lived,
 per-task credentials that name both the human (`sub`) and the agent (`act`),
-are pinned to one API, carry only the scopes the task needs, and expire in
-minutes. Revoke the agent without locking out the human. Every issue,
-use and revocation lands in a tamper-evident audit log.
+are pinned to one API, carry only the scopes the task needs, can be bound to a
+key so a leaked token is useless (DPoP), and expire in minutes. Agents can hand
+sub-agents a *narrower* copy but never a broader one. Revoke the agent without
+locking out the human. Every issue, use and revocation lands in a
+tamper-evident audit log, and any language can verify tokens offline against a
+published spec and 89 test vectors.
 
 One `pip install`, three small dependencies (PyJWT, cryptography, PyYAML), no
 server, database or cloud account required.
@@ -60,6 +63,73 @@ delcred audit verify               # hash chain intact? prints the head hash
 Tokens are read from `--*-file`, `$DELCRED_SUBJECT_TOKEN` / `$DELCRED_ACTOR_TOKEN`,
 or `$…_FILE` (Docker-secrets style). Avoid passing them as CLI arguments —
 command lines are visible in `ps`.
+
+## A real agent loop in one file
+
+`python examples/agent_loop.py` runs a scripted agent against a tool server:
+the agent holds a key-bound 15-minute token, a prompt-injected document tells
+it to delete an invoice (refused, 403 `insufficient_scope`) and to leak its
+token (useless without the key), a sub-agent receives a narrower copy, and
+pulling the kill switch refuses both. The "model" is a stand-in; swap `plan()`
+for your LLM call.
+
+## Sub-delegation: a child never gets more than its parent
+
+```yaml
+grants:
+  - user: u_alice
+    agent: orchestrator
+    scopes: ["invoices:read", "invoices:write"]
+    resources: ["https://api.acme.test/v1"]
+    delegate_to: [summarizer]   # deny by default: nobody else may receive a copy
+    max_depth: 2                # hops below the orchestrator (hard cap 4)
+```
+
+```python
+child = delcred.attenuate(parent_token,
+                          sub_agent_token=delcred.agent_token("summarizer"),
+                          scope="invoices:read", resource=RESOURCE)
+```
+
+The child's `act` nests per RFC 8693 §4.4 (`summarizer` acting for
+`orchestrator` acting for `u_alice`) and `chain` lists ancestor token ids.
+Enforced at mint time: scope ⊆ parent's *and* ⊆ the user's current grant; same
+audience; `exp` ≤ parent's; named sub-agent proves its identity with its own
+agent token; no cycles; single-use parents cannot delegate; a DPoP-bound parent
+needs a proof and the child stays bound. Revoking an ancestor token, **any**
+agent in the chain, or the user kills the child. `POST /token` does the same
+with a delegation token as `subject_token`. A committed fuzz run
+(`bench/run_bench.py`) tries 3,000 widening attempts: 0 invariant violations.
+
+## Stolen-token defence: DPoP (RFC 9449, Ed25519)
+
+```python
+from delcred import pop
+key = pop.generate_key()                                    # stays in the agent
+tok = delcred.delegate(..., dpop_jkt=pop.thumbprint(key))   # token carries cnf.jkt
+proof = pop.make_proof(key, "GET", url, access_token=tok)   # per request
+# server: Authorization: DPoP <tok> + DPoP: <proof>
+delcred.verify(tok, expected_resource=RES, dpop_proof=proof, http_method="GET", http_url=url)
+```
+
+A leaked bound token fails without the key; the proof is checked before
+revocation and before a single-use burn, so a thief cannot even consume it.
+`delcred.mcp.authorize(..., dpop_proof=, http_method=, http_url=)` returns the
+RFC 9449 `DPoP` challenge. `POST /token` accepts a `DPoP` header (or
+`dpop_jkt`) and answers `token_type: DPoP`.
+
+## Verify from any language (offline) + revocation that third parties see
+
+`spec/VERIFICATION.md` is the verifier spec; `spec/vectors/vectors.json` has 89
+cases (alg confusion, embedded-key headers, `crit`, NBSP-in-scope, leeway
+boundaries, chains, DPoP, bulletins). Dependency-free Node
+(`spec/verifiers/node`) and Go (`spec/verifiers/go`) verifiers pass all of
+them; so does `delcred.offline.verify_offline`. A JWKS alone cannot reveal
+revocations, so the issuer publishes a short-lived **signed bulletin**
+(`delcred revocations export`, `GET /revocations.jwt`); pass it to the verifier
+and a kill switch reaches third parties within the bulletin age (default 5 min)
+instead of at token expiry. `delcred offline-verify TOKEN --jwks-file ...`
+shows the third-party view.
 
 ## Use it from Claude Code (MCP `headersHelper`)
 
@@ -272,6 +342,41 @@ Statements below are limited to what each vendor's own page says (linked);
 | Tamper-evident (hash-chained) audit | yes | — | logs every request | near-real-time logging | — | audit devices (HMAC'd fields) |
 | Multi-agent chained delegation | **no** (single hop) | — | — | yes | — | — |
 
+### Closer to the metal: token formats you can `pip install`
+
+Measured by `bench/run_bench.py` (one Linux x86-64 machine, Python 3.13,
+single thread, operations per second; re-run it, ratios matter more than
+absolutes):
+
+| | delcred 0.4 | PyJWT EdDSA (plain JWT) | Biscuit (`biscuit-python`) | pymacaroons |
+|---|---|---|---|---|
+| Verify | 1,360/s full (signature, audience, scope, revocation, audit write); 7,700/s offline | 7,300/s | 7,450/s parse+authorize | 93,600/s (HMAC, issuer-only) |
+| Holder narrows a token offline | no (issuer-mediated) | no | **yes** (17,300/s) | **yes** |
+| Issuer enforces user/agent/scope policy, audit log, kill switches | **yes** | no | no (bring your own) | no |
+| Third-party verification without the secret | yes (JWKS + bulletin) | yes | yes | no |
+| Sender-constrained (key-bound) tokens | **yes** (DPoP) | DIY | DIY | DIY |
+| Token size, 1 hop / 2 hops | 541 / 604 bytes | n/a | 288 / 460 bytes | 220 bytes (3 caveats) |
+
+Where they win: Biscuit and Macaroons let a *holder* attenuate with no round
+trip and carry richer logic ([Biscuit](https://github.com/eclipse-biscuit/biscuit-rust):
+"offline delegation" and public-key verification; it lists revocation as
+requiring "external state management"). delcred's bet is the opposite
+trade-off: the issuer checks every narrowing against a user-owned policy,
+records it, and can kill a whole chain by agent or user.
+
+Cloud and platform identity, from their own docs: AWS IAM Roles Anywhere
+sessions last 15 min to 12 h and are obtained by signing with an X.509
+certificate ([AWS](https://docs.aws.amazon.com/rolesanywhere/latest/userguide/authentication-create-session));
+Microsoft Entra Agent ID models autonomous and on-behalf-of agents through
+Entra-registered agent identities
+([Microsoft Learn](https://learn.microsoft.com/en-sg/entra/msidweb/agent-id-sdk/agent-identities));
+Descope's Agentic Identity Hub provides per-MCP-server authorization servers,
+a credential vault and per-agent/per-tool scopes
+([Descope](https://www.descope.com/blog/post/agentic-identity-hub)).
+All are tied to their platform; none of those pages describe an
+open verifier spec or offline conformance vectors (absence on a page is not
+proof of absence). SPIRE/SPIFFE, WorkOS and Stytch were not evaluated.
+
 Where they are ahead: hosted platforms give you an admin UI, central
 multi-host revocation, IdP/SCIM integration, and (Auth0, Arcade) real OAuth
 connections to SaaS tools with refresh handling. Keycard handles
@@ -306,16 +411,20 @@ service.
 
 ## Limitations (read before production)
 
-1. **Bearer tokens.** Anyone holding a delegation JWT or `dk_…` key can use it
-   until it expires. Mitigations: 15-min default TTL, single-use option,
-   resource pinning, instant local revocation. Sender-constrained tokens
-   (DPoP/mTLS) are not implemented.
+1. **Bearer tokens by default.** Anyone holding a delegation JWT or `dk_…` key
+   can use it until it expires. Mitigations: 15-min default TTL, single-use
+   option, resource pinning, instant local revocation, and **DPoP key binding**
+   (JWTs only; `dk_` keys cannot be bound; mTLS binding is not implemented).
+   The DPoP replay cache is process-local: run one verifier process or share it.
 2. **Single-host state.** Revocations, broker records and the audit log live in
    one delcred home. There is no multi-host revocation sync — run one issuer
    per trust domain. Third-party verifiers using only the JWKS do **not** see
    revocations; they rely on short expiry.
-3. **Key rotation is a hard cut.** `delcred key rotate` invalidates every token
-   signed by the old key (`kid mismatch`). There is no overlap window yet.
+3. **Key rotation is a hard cut by default.** `delcred key rotate` invalidates
+   every token signed by the old key. Routine rotation: `delcred key rotate
+   --keep-old` keeps the old key verifying (never signing, published in the
+   JWKS) for 24 h + 60 s, or a number of seconds you choose; `delcred key retire
+   KID` ends it early. After a suspected compromise use the hard cut.
 4. **Single-use ≠ exactly-once.** It bounds credential replay, not downstream
    side effects.
 5. **Local user assertions are dev-only.** In production register your IdP
@@ -326,14 +435,17 @@ service.
    policy (rate-limited). `/revoke` is loopback-only unless you set an admin
    token. Put TLS + auth in front before exposing it. `/token` also accepts
    JSON bodies and requires `scope`, which is stricter than RFC 8693.
-7. **No chained delegation** (`may_act`, agent → sub-agent).
+7. **Chained delegation is issuer-mediated.** Sub-agents get tokens by asking
+   the issuer (which enforces attenuation); there is no offline, holder-side
+   attenuation as in Biscuit/Macaroons, and no `may_act` claim.
 8. **Windows** is supported by design (portable locking, no POSIX-only
    imports) but the test suite runs on Linux; on Windows the 0600 key-file
    check is skipped and protection relies on your profile's NTFS ACLs.
-9. **Scale.** State files are JSONL scanned on each check. Measured on a
-   Linux dev box: a revocation check over 10,000 entries takes ~15 ms, so
-   this suits thousands of live records, not millions. Run `delcred prune`
-   to drop expired entries. Agent/user kill switches are permanent (there is
+9. **Scale.** Broker and audit files are JSONL. Revocation lookups
+   are indexed in memory (one `stat` per check, only new bytes parsed after an
+   append): 0.004 ms at 100,000 entries versus 173 ms in 0.3.0 (`bench/`).
+   The index is per process and the files still grow without bound, so run
+   `delcred prune`; signed bulletins list every live revocation and grow with it. Agent/user kill switches are permanent (there is
    no un-revoke command yet).
 10. **Clock skew.** 60 s leeway is assumed.
 11. **Token `iss` is not a URL.** Tokens carry `iss: "delcred"` while the
@@ -351,7 +463,7 @@ python3 -m venv .venv && .venv/bin/pip install -e ".[dev]" ruff
 .venv/bin/ruff check delcred tests
 ```
 
-Layout: `delcred/{tokens,keys,policy,exchange,revocation,broker,audit,mcp,cli,server,sidecar,demo,_lock}.py`
+Layout: `delcred/{tokens,keys,policy,exchange,revocation,broker,audit,mcp,pop,offline,bulletin,vectors,cli,server,sidecar,demo,_lock,_jws}.py`, `spec/`, `examples/`, `bench/`.
 
 ## License
 

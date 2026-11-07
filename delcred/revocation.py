@@ -32,6 +32,42 @@ from ._lock import atomic_rewrite, file_lock
 # below takes both (thread lock outermost — never nest them).
 _thread_lock = threading.Lock()
 
+_cache_lock = threading.Lock()
+# path -> (inode, bytes consumed, _Index). Grown incrementally on append.
+_INDEX_CACHE: dict[str, tuple[int, int, _Index]] = {}
+
+
+class _Index:
+    """Revocation entries grouped for O(1) lookup."""
+
+    def __init__(self) -> None:
+        self.jti: dict[str, list[tuple[int | None, str]]] = {}
+        self.agent: dict[str, list[tuple[int | None, str]]] = {}
+        self.user: dict[str, list[tuple[int | None, str, str | None]]] = {}
+
+    def add(self, e: Any) -> None:
+        if not isinstance(e, dict):
+            return
+        exp, reason, t = e.get("expires_at"), str(e.get("reason") or ""), e.get("type")
+        if t == "jti" and isinstance(e.get("jti"), str):
+            self.jti.setdefault(e["jti"], []).append((exp, reason))
+        elif t == "agent" and isinstance(e.get("agent"), str):
+            self.agent.setdefault(e["agent"], []).append((exp, reason))
+        elif t == "user" and isinstance(e.get("user"), str):
+            self.user.setdefault(e["user"], []).append((exp, reason, e.get("iss")))
+
+
+def _heal_tail(f) -> None:
+    """If a crash left a torn final line, terminate it so the next entry does
+    not get glued onto it (which would silently lose that entry)."""
+    f.seek(0, os.SEEK_END)
+    if f.tell() == 0:
+        return
+    f.seek(-1, os.SEEK_END)
+    if f.read(1) != b"\n":
+        f.write(b"\n")
+        f.flush()
+
 
 def _now() -> int:
     return int(time.time())
@@ -45,10 +81,9 @@ class RevocationList:
     # -- mutation (locked, atomic append) ---------------------------------
 
     def _append(self, entry: dict[str, Any]) -> None:
-        with _thread_lock, file_lock(self.path), open(
-            self.path, "a", encoding="utf-8"
-        ) as f:
-            f.write(json.dumps(entry) + "\n")
+        with _thread_lock, file_lock(self.path), open(self.path, "ab+") as f:
+            _heal_tail(f)
+            f.write((json.dumps(entry) + "\n").encode("utf-8"))
             f.flush()
             os.fsync(f.fileno())
 
@@ -95,35 +130,26 @@ class RevocationList:
         rejected. This is what makes single-use credentials actually
         single-use across processes.
         """
-        with _thread_lock, file_lock(self.path), open(
-            self.path, "a+", encoding="utf-8"
-        ) as f:
-            f.seek(0)
+        with _thread_lock, file_lock(self.path), open(self.path, "ab+") as f:
             now = _now()
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    e = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                if e.get("type") != "jti" or e.get("jti") != jti:
-                    continue
-                exp = e.get("expires_at")
+            _heal_tail(f)
+            idx = self._refresh(f)  # amortised O(new bytes), not O(file)
+            for exp, _ in idx.jti.get(jti, ()):
                 if exp is None or exp >= now:
                     return False  # already denylisted
             f.write(
-                json.dumps(
-                    {
-                        "type": "jti",
-                        "jti": jti,
-                        "revoked_at": now,
-                        "reason": reason,
-                        "expires_at": expires_at,
-                    }
-                )
-                + "\n"
+                (
+                    json.dumps(
+                        {
+                            "type": "jti",
+                            "jti": jti,
+                            "revoked_at": now,
+                            "reason": reason,
+                            "expires_at": expires_at,
+                        }
+                    )
+                    + "\n"
+                ).encode("utf-8")
             )
             f.flush()
             os.fsync(f.fileno())
@@ -132,56 +158,125 @@ class RevocationList:
     # -- reads ------------------------------------------------------------
 
     def _entries(self) -> list[dict[str, Any]]:
+        """Every parseable row (used by ``status``; lookups use the index)."""
         rows = []
-        with _thread_lock, file_lock(self.path, shared=True), open(
-            self.path, encoding="utf-8"
-        ) as f:
-            for line in f:
-                line = line.strip()
+        with _thread_lock, file_lock(self.path, shared=True), open(self.path, "rb") as f:
+            for raw in f:
+                line = raw.strip()
                 if line:
                     try:
                         rows.append(json.loads(line))
-                    except json.JSONDecodeError:
+                    except (json.JSONDecodeError, UnicodeDecodeError):
                         continue
         return rows
 
+    def _refresh(self, f) -> _Index:
+        """Bring the cached index up to date using the open handle ``f``.
+
+        The caller holds a lock on the data file (shared or exclusive), so
+        every line it sees is complete. Only the bytes appended since the
+        last refresh are parsed; a replaced (pruned) or truncated file is
+        re-read from the start.
+        """
+        key = str(self.path)
+        st = os.fstat(f.fileno())
+        with _cache_lock:
+            ent = _INDEX_CACHE.get(key)
+            if ent is not None and ent[0] == st.st_ino and ent[1] <= st.st_size:
+                _, offset, idx = ent
+            else:
+                offset, idx = 0, _Index()
+            if offset == st.st_size and ent is not None and ent[0] == st.st_ino:
+                return idx
+            f.seek(offset)
+            data = f.read()
+            end = data.rfind(b"\n") + 1  # a torn final line is not consumed
+            for raw in data[:end].splitlines():
+                line = raw.strip()
+                if not line:
+                    continue
+                try:
+                    idx.add(json.loads(line))
+                except (json.JSONDecodeError, UnicodeDecodeError):
+                    continue
+            if len(_INDEX_CACHE) > 64:
+                _INDEX_CACHE.clear()
+            _INDEX_CACHE[key] = (st.st_ino, offset + end, idx)
+            return idx
+
+    def _index(self) -> _Index:
+        """Parsed view of the file. A cache hit costs one ``stat``; after an
+        append only the new bytes are parsed (measured in ``bench/``)."""
+        try:
+            st = os.stat(self.path)
+        except FileNotFoundError:
+            return _Index()
+        ent = _INDEX_CACHE.get(str(self.path))
+        if ent is not None and ent[0] == st.st_ino and ent[1] == st.st_size:
+            return ent[2]
+        with _thread_lock, file_lock(self.path, shared=True), open(self.path, "rb") as f:
+            return self._refresh(f)
+
     def is_revoked(self, claims: dict[str, Any]) -> tuple[bool, str]:
-        """Check jti + agent kill-switch + user kill-switch. Returns (revoked, why)."""
+        """Check jti, ancestor jtis, every agent in the actor chain, and the user.
+
+        Returns ``(revoked, why)``. A chained delegation dies when its own
+        jti, ANY ancestor delegation's jti, ANY agent in the chain, or the
+        user is revoked.
+        """
         now = _now()
-        jti = claims.get("jti")
-        # Agent identity: for delegation tokens the agent is act.sub; for
-        # agent-identity tokens (kind="agent") it is sub itself.
-        agent = (claims.get("act") or {}).get("sub")
-        if agent is None and claims.get("kind") == "agent":
-            agent = claims.get("sub")
         from .tokens import user_issuer
 
+        agents: list[str] = []
+        node: Any = claims.get("act")
+        while isinstance(node, dict) and len(agents) < 16:
+            if isinstance(node.get("sub"), str):
+                agents.append(node["sub"])
+            node = node.get("act")
+        # Agent identity tokens (kind="agent") name the agent in ``sub``.
+        if not agents and claims.get("kind") == "agent" and isinstance(claims.get("sub"), str):
+            agents.append(claims["sub"])
+        jtis = [j for j in [claims.get("jti"), *(claims.get("chain") or [])] if isinstance(j, str)]
         # Agent identity tokens name an agent in ``sub``, not a user.
         user = None if claims.get("kind") == "agent" else claims.get("sub")
         user_iss = user_issuer(claims)
-        for e in self._entries():
-            exp = e.get("expires_at")
-            if exp is not None and exp < now:
-                continue  # stale jti entry; token is expired anyway
-            t = e.get("type")
-            if t == "jti" and jti and e.get("jti") == jti:
-                return True, f"token revoked: {e.get('reason') or 'jti denylisted'}"
-            if t == "agent" and agent and e.get("agent") == agent:
-                return (
-                    True,
-                    f"agent {agent!r} revoked: {e.get('reason') or 'kill switch'}",
-                )
-            if (
-                t == "user"
-                and user
-                and e.get("user") == user
-                and (not e.get("iss") or e.get("iss") == user_iss)
-            ):
-                return (
-                    True,
-                    f"user {user!r} revoked: {e.get('reason') or 'kill switch'}",
-                )
+        idx = self._index()
+        for j in jtis:
+            for exp, reason in idx.jti.get(j, ()):
+                if exp is None or exp >= now:
+                    who = "token" if j == claims.get("jti") else "parent delegation"
+                    return True, f"{who} revoked: {reason or 'jti denylisted'}"
+        for a in agents:
+            for exp, reason in idx.agent.get(a, ()):
+                if exp is None or exp >= now:
+                    return True, f"agent {a!r} revoked: {reason or 'kill switch'}"
+        if user:
+            for exp, reason, iss in idx.user.get(user, ()):
+                if (exp is None or exp >= now) and (not iss or iss == user_iss):
+                    return True, f"user {user!r} revoked: {reason or 'kill switch'}"
         return False, ""
+
+    def snapshot(self) -> dict[str, Any]:
+        """Live (non-expired) revocations, for the signed bulletin."""
+        now = _now()
+        idx = self._index()
+        return {
+            "jtis": sorted(
+                j for j, v in idx.jti.items() if any(e is None or e >= now for e, _ in v)
+            ),
+            "agents": sorted(
+                a for a, v in idx.agent.items() if any(e is None or e >= now for e, _ in v)
+            ),
+            "users": sorted(
+                (
+                    {"sub": u, **({"iss": iss} if iss else {})}
+                    for u, v in idx.user.items()
+                    for e, _, iss in v
+                    if e is None or e >= now
+                ),
+                key=lambda d: (d["sub"], d.get("iss", "")),
+            ),
+        }
 
     def prune(self) -> int:
         """Drop expired jti entries. Returns number removed.

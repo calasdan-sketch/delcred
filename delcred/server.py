@@ -17,7 +17,10 @@ Endpoints (JSON request/response):
     POST /verify          {"token","resource","scope"?} → {"valid":true,"claims"}
                           | 403 {"error"[,"missing"]}
     POST /broker/redeem   {"key","resource"?,"scope"?} → {"valid":true,"capability"} | 403
-    GET  /.well-known/jwks.json  → issuer public key (RFC 7517 JWK Set)
+    GET  /.well-known/jwks.json  → issuer public key(s) (RFC 7517 JWK Set; includes
+                                   retired keys still inside their overlap window)
+    GET  /revocations.jwt → signed revocation bulletin (application/jwt) for
+                            third-party verifiers (see delcred.offline)
     POST /revoke          {"jti"?,"agent"?,"user"?,"issuer"?,"reason"?} → {"revoked":true}
                           requires ``Authorization: Bearer <admin token>`` when an
                           admin token is configured, else loopback clients only
@@ -68,6 +71,7 @@ _POLICY_TO_OAUTH = {
     "scope": "invalid_scope",
     "resource": "invalid_target",
     "request": "invalid_request",
+    "delegation": "invalid_grant",
 }
 
 
@@ -190,6 +194,16 @@ class _Handler(BaseHTTPRequestHandler):
             self._send(200, _jwks(self.base))
         elif path == "/.well-known/oauth-authorization-server":
             self._send(200, self._as_metadata())
+        elif path == "/revocations.jwt":
+            from . import bulletin as _bulletin
+
+            body = _bulletin.export(self.base).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/jwt")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(body)
         else:
             self._send(404, {"error": "not found"})
 
@@ -211,6 +225,8 @@ class _Handler(BaseHTTPRequestHandler):
             "token_endpoint": u + "/token",
             "jwks_uri": u + "/.well-known/jwks.json",
             "grant_types_supported": [GRANT_TOKEN_EXCHANGE],
+            "dpop_signing_alg_values_supported": ["EdDSA"],
+            "delcred_revocations_uri": u + "/revocations.jwt",
             "token_endpoint_auth_methods_supported": ["none"],
             "response_types_supported": [],
             "delcred_token_issuer": _c.ISSUER_ID,
@@ -270,6 +286,12 @@ class _Handler(BaseHTTPRequestHandler):
             ttl = int(body.get("ttl") or _c.DEFAULT_TTL)
         except (TypeError, ValueError):
             return err("invalid_request", "ttl must be an integer")
+        dpop_header = self.headers.get("DPoP")
+        dpop_jkt = body.get("dpop_jkt")
+        if dpop_jkt is not None and not isinstance(dpop_jkt, str):
+            return err("invalid_request", "dpop_jkt must be a string")
+        if dpop_header and dpop_jkt:
+            return err("invalid_dpop_proof", "send a DPoP header or dpop_jkt, not both")
         try:
             result = exchange(
                 subject_token=body["subject_token"],
@@ -278,18 +300,22 @@ class _Handler(BaseHTTPRequestHandler):
                 resource=body["resource"],
                 requested_token_type=requested,
                 ttl=ttl,
+                dpop_jkt=dpop_jkt or None,
+                dpop_proof=dpop_header or None,
+                dpop_url=self._base_url() + "/token",
                 base=self.base,
             )
         except PolicyError as e:
             return err(_POLICY_TO_OAUTH.get(getattr(e, "code", "request"), "invalid_request"), str(e))
         except ExchangeError as e:
-            return err("invalid_grant", str(e))
+            code = "invalid_dpop_proof" if "DPoP proof" in str(e) else "invalid_grant"
+            return err(code, str(e))
         self._send(
             200,
             {
                 "access_token": result.credential,
                 "issued_token_type": result.token_type,
-                "token_type": "Bearer",
+                "token_type": "DPoP" if result.claims.get("cnf") else "Bearer",
                 "expires_in": result.ttl,
                 "scope": result.claims.get("scope", ""),
             },
@@ -325,6 +351,7 @@ class _Handler(BaseHTTPRequestHandler):
                         "urn:ietf:params:oauth:token-type:jwt",
                     ),
                     ttl=ttl,
+                    dpop_jkt=body.get("dpop_jkt") or None,
                     base=self.base,
                 )
                 self._send(
@@ -350,6 +377,9 @@ class _Handler(BaseHTTPRequestHandler):
                         expected_resource=body["resource"],
                         required_scopes=body.get("scope") or None,
                         base=self.base,
+                        dpop_proof=self.headers.get("DPoP") or None,
+                        http_method=body.get("http_method") or None,
+                        http_url=body.get("http_url") or None,
                     )
                 except InsufficientScope as e:
                     self._send(
