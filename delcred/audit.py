@@ -219,7 +219,7 @@ class AuditLog:
         since: int | None = None,
     ) -> list[dict[str, Any]]:
         """Most recent ``n`` entries, optionally filtered (exact matches)."""
-        if n > 0 and not (event or agent or user or since is not None):
+        if 0 < n <= 1000 and not (event or agent or user or since is not None):
             return self._last_entries(n)
         keep: deque[dict[str, Any]] = deque(maxlen=max(n, 0))
         for e in self._iter_entries():

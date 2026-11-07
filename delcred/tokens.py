@@ -121,6 +121,7 @@ def mint_delegation_token(
     actors: list[str] | None = None,
     chain: list[str] | None = None,
     cnf_jkt: str | None = None,
+    exp_cap: int | None = None,
     base: Path | None = None,
 ) -> str:
     """Mint a delegation JWT: ``sub``=user, ``act``=agent, pinned to ``resource``.
@@ -133,6 +134,9 @@ def mint_delegation_token(
     delegation: ``act`` nests per RFC 8693 §4.4 and ``chain`` lists the
     ancestor token ids so that revoking any ancestor kills this token.
     ``cnf_jkt`` binds the token to a DPoP key (RFC 9449 ``cnf.jkt``).
+    ``exp_cap`` is an absolute ceiling for ``exp`` (a sub-delegation must never
+    outlive its parent; computing ``now + remaining`` in the caller and again
+    here let the clock tick between the two reads and overshoot by 1 s).
     """
     check_identifier(user, "user")
     check_identifier(agent, "agent")
@@ -156,7 +160,7 @@ def mint_delegation_token(
         "jti": _new_jti(),
         "iat": now,
         "nbf": now,
-        "exp": now + ttl,
+        "exp": now + ttl if exp_cap is None else min(now + ttl, exp_cap),
     }
     if single_use:
         claims["single_use"] = True

@@ -45,6 +45,65 @@
 - User/agent ids with control, bidi, zero-width or whitespace characters are
   refused at mint and exchange (terminal-escape injection into logs).
 
+### Round 3 (expert-2, second review)
+
+#### Security
+- **HIGH fixed: the sidecar could be steered into sending its token anywhere.**
+  An absolute-form request line (`GET http://attacker/x`) together with an
+  allowlisted `X-Delcred-Upstream` made the sidecar send the bearer token to the
+  attacker's host; `file://` and `ftp://` URLs were opened by `urllib`; redirects
+  were followed with the token attached; `GET @host/x` could smuggle a host via
+  userinfo. The upstream is now fixed by the allowlist, schemes are limited to
+  https (http for loopback), redirects are not followed, the caller's
+  `Authorization` is dropped, Content-Length is validated and bodies are capped.
+  Upstream 4xx/5xx now pass through (they were all turned into 502).
+- **HIGH fixed: `delcred serve` was reachable by web pages.** `/revoke` trusted
+  "loopback client", so any page in the user's browser could POST a kill switch;
+  Host headers were unchecked (DNS rebinding). Loopback-bound servers now require
+  a loopback `Host` (421) and refuse browser cross-site POSTs (`Origin`,
+  `Sec-Fetch-Site`).
+- **MEDIUM fixed: rejected credentials left no audit trail** (the docs said they
+  did). `verify_rejected` entries (rate-limited, token never stored, identity
+  hints labelled `claimed_*`).
+- **MEDIUM fixed: child token could outlive its parent by 1 s** when the clock
+  ticked between two reads (found by the benchmark fuzz on a slow disk).
+  `mint_delegation_token(exp_cap=)`.
+- Revocation reasons, policy errors and other untrusted strings are escaped
+  (`_common.safe_text`) before reaching a terminal; reasons are sanitised at rest.
+
+#### Added
+- `verify(check_policy=True)`, `delcred verify --check-policy`,
+  `mcp.authorize(check_policy=True)`: refuse tokens whose grant was removed or
+  narrowed after minting.
+- `delcred audit checkpoint` / `audit verify --checkpoint-file` and
+  `AuditLog.checkpoint()` / `verify(checkpoint=)`: signed "N entries, head H"
+  statements that detect truncation and wholesale rewrites.
+- RFC 7009 holder-side revocation: `POST /oauth/revoke` (advertised as
+  `revocation_endpoint`), `delcred.revoke_presented()`, `delcred revoke --token-file`.
+- `delcred policy validate [--strict]`.
+- `DELCRED_AUDIT_FSYNC=routine-off` (routine `verify_*` lines skip fsync only).
+- Demo step 10b (24 checks); benchmark rows for check_policy, rejected
+  credentials, audit tail/verify at 100k entries; the benchmark now retries
+  Biscuit's occasional wall-clock authorizer limit.
+
+#### Changed / fixed
+- `policy.yaml` is parsed strictly: wrong types (a bare string for a list,
+  `max_ttl: 0` or non-integer, a non-boolean `single_use`, a scope containing a
+  space, grants that are not mappings) raise `PolicyError` and deny exchanges;
+  before, `scopes: "a b"` silently became a set of characters and some shapes
+  crashed with `AttributeError`. **Behaviour change:** policies that relied on
+  those readings now fail loudly. The CLI prints `policy error:` instead of a traceback.
+- `audit` tail, filters and verification stream the file (100,000 entries:
+  tail 3.8 s and 370 MB -> 1 ms and 34 MB; `verify` no longer holds the lock).
+- `delcred init` (and `--home NEWDIR init`) creates a missing home directory
+  (it crashed with FileNotFoundError).
+- DPoP `ath` over a non-ASCII token raises `PopError`, not `UnicodeEncodeError`.
+- Two wall-clock assertions in the test suite (`fsync` speed) are now
+  deterministic or looser; they failed on slow disks.
+- README: the quick start no longer says `pip install delcred` (PyPI still has
+  only the old 0.2.0, checked with `pip index`); sample demo output, the
+  chained-delegation row of the comparison and the benchmark table were stale.
+
 ### Compatibility
 - All 0.3 APIs and tokens keep working. A delegation token used as
   `subject_token` previously always failed; it now works only for agents the

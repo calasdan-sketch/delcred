@@ -330,7 +330,7 @@ def cmd_audit(args):
         try:
             res = log.verify(checkpoint=cp)
         except ValueError as e:
-            print(f"TAMPERED  checkpoint unusable: {_st(e)}", file=sys.stderr)
+            print(f"CHECKPOINT UNUSABLE: {_st(e)} (after a hard key rotation, take a new checkpoint)", file=sys.stderr)
             sys.exit(6)
         if res.ok:
             print(

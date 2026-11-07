@@ -148,6 +148,21 @@ def run_demo(out: Callable[[str], None] = print) -> bool:
                                            bulletin=delcred.bulletin.export(h))
         check("a resource server with no delcred home accepts it", v.ok, v.code)
 
+        out("10b. policy stays live; tokens can be ended from either side")
+        pol_path = h / "policy.yaml"
+        saved = pol_path.read_text()
+        pol_path.write_text("grants: []\n")
+        ok, d = denied(lambda: delcred.verify(tok, expected_resource=RES, base=h, check_policy=True))
+        check("grant removed -> already-minted token refused (check_policy)", ok, d)
+        pol_path.write_text(saved)
+        mine = delcred.delegate(scope="invoices:read", resource=RES, user_token=user, agent_token=agent, base=h)
+        check("the holder ends its own token when the task is done", delcred.revoke_presented(mine, base=h))
+        ok, d = denied(lambda: delcred.verify(mine, expected_resource=RES, base=h))
+        check("…and a leaked copy is already dead", ok, d)
+        denied(lambda: delcred.verify(tok[:-4] + "AAAA", expected_resource=RES, base=h))
+        check("a forged token leaves a trace in the audit log",
+              any(e["event"] == "verify_rejected" for e in delcred.AuditLog(h).entries()))
+
         out("11. kill switch")
         delcred.revoke_agent("billing-agent", reason="demo: suspected prompt injection", base=h)
         ok, d = denied(lambda: delcred.verify(tok, expected_resource=RES, base=h))

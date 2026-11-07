@@ -25,7 +25,7 @@ import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import ClassVar
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlsplit
 
 from . import _common as _c
 from .broker import Broker
@@ -172,6 +172,10 @@ class _ProxyHandler(BaseHTTPRequestHandler):
         if parsed.netloc and parsed.netloc.lower() != target:
             self.send_error(400, "request URL host does not match the allowlisted upstream")
             return
+        if parsed.path and not parsed.path.startswith("/"):
+            # "GET @evil.test/x" would otherwise become https://<target>@evil.test/x
+            self.send_error(400, "request path must start with '/'")
+            return
         scheme = (parsed.scheme or "https").lower()
         if scheme not in ("https", "http") or (scheme == "http" and not _is_loopback_host(target)):
             self.send_error(400, "only https upstreams are allowed (http for loopback only)")
@@ -194,6 +198,9 @@ class _ProxyHandler(BaseHTTPRequestHandler):
         url = f"{scheme}://{target}{parsed.path or '/'}"
         if parsed.query:
             url += "?" + parsed.query
+        if urlsplit(url).netloc.lower() != target:  # belt and braces: the host is the allowlisted one
+            self.send_error(400, "request URL does not resolve to the allowlisted upstream")
+            return
         req = urllib.request.Request(url, data=body, method=self.command)
         for k, v in self.headers.items():
             if k.lower() in _DROP_REQUEST_HEADERS:

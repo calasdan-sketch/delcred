@@ -5,6 +5,7 @@ policy-aware verify, holder-side revocation, terminal-escape hygiene."""
 import http.client
 import json
 import threading
+import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
@@ -537,3 +538,72 @@ def test_init_creates_a_missing_home_directory(tmp_path):
     import os
     if os.name != "nt":
         assert oct(target.stat().st_mode & 0o777) == "0o700"
+
+
+def test_sidecar_refuses_userinfo_smuggling_in_request_path(proxy):
+    """`GET @evil.test/x` must not become https://<allowlisted>@evil.test/x."""
+    port, up = proxy
+    thief = _Upstream()
+    try:
+        for path in (f"@{thief.host}/x", f"//{thief.host}/x", f"x@{thief.host}/", f"{thief.host}/x"):
+            c = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+            c.putrequest("GET", path, skip_host=False)
+            c.putheader("X-Delcred-Upstream", up.host)
+            c.endheaders()
+            assert c.getresponse().status in (400, 403, 502)  # 502: stdlib rewrote "//h/x" to "/h/x" on the allowlisted host (https to a plain-http test server)
+        assert thief.seen == [] and up.seen == []
+    finally:
+        thief.close()
+
+
+def test_oauth_revoke_accepts_form_encoding_and_is_idempotent(api, home, subject, actor):
+    port, _ = api
+    tok = delcred.delegate(scope="invoices:read", resource=RES, user_token=subject, agent_token=actor, base=home)
+    body = urllib.parse.urlencode({"token": tok, "token_type_hint": "access_token"})
+    for _ in range(3):
+        st, _, _ = _req(port, "POST", "/oauth/revoke", {"Content-Type": "application/x-www-form-urlencoded"}, body)
+        assert st == 200
+    rows = [e for e in AuditLog(home).entries() if e["event"] == "token_revoked_by_holder"]
+    assert len(rows) == 1
+
+
+def test_audit_tail_large_n_falls_back_to_stream(home):
+    log = AuditLog(home)
+    for i in range(30):
+        log.record("verify_ok", jti=f"j{i}")
+    assert log.tail(5000) == log.entries()
+
+
+def test_child_never_outlives_parent_even_if_the_clock_ticks_mid_call(home, monkeypatch):
+    """Regression: the bench fuzz found exp(child) = exp(parent) + 1 on a slow disk,
+    because 'remaining' and the child's iat were read from two different clock reads."""
+
+    from delcred import tokens as T
+
+    (home / "policy.yaml").write_text(
+        f"""grants:
+  - user: u_alice
+    agent: orch
+    scopes: ["a"]
+    resources: ["{RES}"]
+    delegate_to: [sub]
+    max_depth: 1
+"""
+    )
+    parent = delcred.delegate(
+        scope="a", resource=RES, ttl=30, base=home,
+        user_token=delcred.user_token("u_alice", base=home),
+        agent_token=delcred.agent_token("orch", base=home),
+    )
+    pexp = T.decode_unverified(parent)["exp"]
+    sub = delcred.agent_token("sub", base=home)
+    real = T._now
+    calls = {"n": 0}
+
+    def ticking():  # second read lands one second later than the first
+        calls["n"] += 1
+        return real() + (1 if calls["n"] >= 1 else 0)
+
+    monkeypatch.setattr(T, "_now", ticking)
+    child = delcred.attenuate(parent, sub_agent_token=sub, scope="a", resource=RES, base=home)
+    assert T.decode_unverified(child)["exp"] <= pexp

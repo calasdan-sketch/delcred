@@ -341,6 +341,7 @@ def _attenuate(
         actors=[child, *actors],
         chain=[*parent.get("chain", []), parent["jti"]],
         cnf_jkt=new_jkt,
+        exp_cap=int(parent["exp"]),
         base=home_,
     )
     claims = tokens.decode_unverified(jwt_)
@@ -402,9 +403,10 @@ def revoke_presented(token: str, *, base: Path | None = None) -> bool:
         claims = tokens.verify_delegation_token(token, base=home_)
     except tokens.TokenError:
         return False
-    RevocationList(home_).revoke_jti(
-        claims["jti"], reason="revoked by holder", expires_at=int(claims["exp"]) + 300
-    )
+    rl = RevocationList(home_)
+    if rl.is_revoked(claims)[0]:
+        return True  # already dead; do not grow the log on repeated calls
+    rl.revoke_jti(claims["jti"], reason="revoked by holder", expires_at=int(claims["exp"]) + 300)
     audit.record(
         "token_revoked_by_holder",
         jti=claims["jti"],

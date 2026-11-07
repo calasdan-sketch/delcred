@@ -13,6 +13,7 @@ with ``PYTHONPATH=/path/to/old python bench/run_bench.py`` to get a baseline
 from __future__ import annotations
 
 import json
+import os
 import platform
 import random
 import shutil
@@ -64,6 +65,41 @@ def bench_delcred(out: dict) -> None:
     d["verify_signature_only_per_s"] = rate(
         lambda: tokens.verify_delegation_token(tok, expected_resource=RES, base=h), 800)
     d["token_bytes"] = len(tok)
+    if "check_policy" in delcred.verify.__code__.co_varnames:  # round 3+
+        d["verify_check_policy_per_s"] = rate(
+            lambda: delcred.verify(tok, expected_resource=RES, base=h, check_policy=True), 300)
+        os.environ["DELCRED_AUDIT_FSYNC"] = "routine-off"
+        d["verify_full_audit_fsync_routine_off_per_s"] = rate(
+            lambda: delcred.verify(tok, expected_resource=RES, base=h), 600)
+        del os.environ["DELCRED_AUDIT_FSYNC"]
+        bad = tok[:-4] + "AAAA"
+
+        def rejected():
+            try:
+                delcred.verify(bad, expected_resource=RES, base=h)
+            except delcred.TokenError:
+                pass
+
+        d["verify_rejected_per_s"] = rate(rejected, 300)
+
+    # audit log at 100,000 entries: reading the newest lines, full verification
+    from delcred import audit as _audit
+
+    al = delcred.AuditLog(h)
+    prev = _audit.GENESIS
+    with open(al.path, "w", encoding="utf-8") as f:
+        for i in range(100_000):
+            e = {"ts": 1_700_000_000 + i, "event": "verify_ok", "jti": f"j{i}", "user": "u", "agent": "a", "prev": prev}
+            e["hash"] = _audit._digest(e)
+            prev = e["hash"]
+            f.write(json.dumps(e) + "\n")
+    t0 = time.perf_counter()
+    al.tail(20)
+    d["audit_tail20_ms_at_100k"] = round((time.perf_counter() - t0) * 1000, 2)
+    t0 = time.perf_counter()
+    assert al.verify().ok
+    d["audit_verify_s_at_100k"] = round(time.perf_counter() - t0, 2)
+    (h / "audit.jsonl").write_text("")
 
     # revocation check latency vs. list size
     rl = RevocationList(h)
@@ -219,7 +255,12 @@ def bench_competitors(out: dict) -> None:
         s = att.to_base64()
         def authz():
             tok = ba.Biscuit.from_base64(s, kp.public_key)
-            ba.AuthorizerBuilder('allow if right("invoices:read");').build(tok).authorize()
+            for _ in range(5):  # Biscuit has a ~1 ms Datalog wall-clock limit; a loaded box trips it
+                try:
+                    ba.AuthorizerBuilder('allow if right("invoices:read");').build(tok).authorize()
+                    return
+                except ba.AuthorizationError:
+                    continue
         c["biscuit_python"] = {
             "mint_per_s": rate(mk, 800),
             "attenuate_offline_per_s": rate(lambda: root.append(ba.BlockBuilder('check if right("invoices:read");')), 800),

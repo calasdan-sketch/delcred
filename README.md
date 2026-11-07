@@ -7,7 +7,8 @@ key so a leaked token is useless (DPoP), and expire in minutes. Agents can hand
 sub-agents a *narrower* copy but never a broader one. Revoke the agent without
 locking out the human. Every issue, use and revocation lands in a
 tamper-evident audit log, and any language can verify tokens offline against a
-published spec and 89 test vectors.
+published spec and 89 test vectors. Take a grant out of the policy and
+already-minted tokens can die with it (`verify --check-policy`).
 
 One `pip install`, three small dependencies (PyJWT, cryptography, PyYAML), no
 server, database or cloud account required.
@@ -15,7 +16,8 @@ server, database or cloud account required.
 ## Quick start (60 seconds)
 
 ```bash
-pip install delcred
+git clone <this repository> && cd delcred
+pip install .          # Python 3.10+; PyPI's `delcred` is the old 0.2.0, not this code
 delcred demo
 ```
 
@@ -30,15 +32,16 @@ delcred demo
   [ok] read token refused for a write operation  (InsufficientScope: …)
 4. confused-deputy defense
   [ok] token for API A rejected by API B  (InvalidToken: audience mismatch …)
-5. MCP resource server (spec-shaped 401/403)
-  [ok] 403 insufficient_scope with step-up challenge
 …
-8. kill switch
+10b. policy stays live; tokens can be ended from either side
+  [ok] grant removed -> already-minted token refused (check_policy)
+  [ok] the holder ends its own token when the task is done
+11. kill switch
   [ok] revoked agent's token dies instantly
-9. tamper-evident audit trail
+12. tamper-evident audit trail
   [ok] an edited audit line is detected  (line 2: content altered (hash mismatch))
 
-13/13 guarantees held.
+24/24 guarantees held.
 ```
 
 Then set up your own home:
@@ -58,6 +61,7 @@ delcred verify "$(head -1 token.jwt)" --resource https://api.acme.test/v1 \
                --require-scope invoices:read
 delcred revoke --agent billing-agent --reason "suspected prompt injection"
 delcred audit verify               # hash chain intact? prints the head hash
+delcred policy validate            # typos, duplicate grants, wrong types in policy.yaml
 ```
 
 Tokens are read from `--*-file`, `$DELCRED_SUBJECT_TOKEN` / `$DELCRED_ACTOR_TOKEN`,
@@ -100,6 +104,9 @@ needs a proof and the child stays bound. Revoking an ancestor token, **any**
 agent in the chain, or the user kills the child. `POST /token` does the same
 with a delegation token as `subject_token`. A committed fuzz run
 (`bench/run_bench.py`) tries 3,000 widening attempts: 0 invariant violations.
+(An earlier run on a slow disk caught a one-second overshoot: a child could
+expire a second after its parent when the clock ticked mid-call; `exp` is now
+capped at the parent's absolute `exp` and a regression test pins it.)
 
 ## Stolen-token defence: DPoP (RFC 9449, Ed25519)
 
@@ -238,8 +245,16 @@ tokens (catches swapped tokens before anything is minted).
 | `GET /.well-known/jwks.json` | issuer public key |
 | `GET /health` | liveness |
 
+| `POST /oauth/revoke` | RFC 7009: the **holder** ends its own token (`token=…`, form or JSON); always 200, no oracle; advertised as `revocation_endpoint` |
+
+A server bound to a loopback address answers only to loopback `Host` headers
+(421 otherwise: DNS-rebinding guard; add your public name with `--public-url`),
+and refuses POSTs that a browser marks cross-site (`Origin` /
+`Sec-Fetch-Site`), so a web page cannot reach `/revoke` as "a loopback
+client". There is no CORS support by design.
+
 Requests run on threads with a 10-second socket timeout, and `/token`,
-`/exchange` and `/revoke` are limited to `--rate-limit` requests per minute
+`/exchange`, `/revoke` and `/oauth/revoke` are limited to `--rate-limit` requests per minute
 per client IP (default 60; HTTP 429 with `Retry-After`).
 
 ## The sidecar pattern
@@ -254,6 +269,18 @@ delcred sidecar --port 8080 \
 # agent calls http://localhost:8080 with X-Delcred-Upstream: api.acme.test
 # sidecar injects: Authorization: Bearer <15-min delegation token>
 ```
+
+What the sidecar enforces, because the caller may be a prompt-injected agent:
+the credential only ever goes to the allowlisted host (an absolute-form request
+line or `X-Delcred-Upstream` naming a different host is refused, as is a path
+that does not start with `/`); only `https` (plain `http` solely for loopback
+targets); redirects are **not** followed (the 3xx is returned to the caller,
+without the token); the caller's own `Authorization` header is dropped;
+upstream 4xx/5xx statuses and headers pass through (so an agent sees a real
+`403 insufficient_scope`, not a blanket 502); bodies are capped (16 MiB in,
+32 MiB out). Request lines are origin-form (`GET /path`) with the
+`X-Delcred-Upstream` header, or absolute-form naming the same host. Proxy
+environment variables (`HTTPS_PROXY`, `NO_PROXY`) are honoured as before.
 
 ## External IdPs (production subject tokens)
 
@@ -305,6 +332,19 @@ grants:
     single_use: false   # true → jti burned on first successful verify
 ```
 
+`delcred policy validate` lints the file (misspelt keys such as `scope:`,
+duplicate grants where only the first counts, `http://` or trailing-slash
+resources, wildcard-looking scopes, an unknown agent). A wrong type, e.g. a bare
+string where a list belongs (`scopes: "a b"`), is now an error instead of being
+read as a set of single characters, and a malformed file denies every exchange.
+
+Tokens already minted stay valid until they expire (at most 60 minutes) even
+after you delete their grant, unless the verifier asks for
+`delcred.verify(..., check_policy=True)` / `delcred verify --check-policy` /
+`mcp.authorize(..., check_policy=True)`; that re-reads `policy.yaml` on every
+call (it needs the delcred home, so it fits a verifier beside the issuer, not
+an offline one) and costs a YAML parse per verify.
+
 Dry-run: `delcred policy check --user u_alice --agent billing-agent --scope invoices:read --resource https://api.acme.test/v1`
 
 ## Audit trail
@@ -321,10 +361,29 @@ delcred audit verify                   # exit 6 + line numbers if anything was e
 delcred audit head                     # newest hash — store it somewhere else
 ```
 
+Credentials that fail verification (bad signature, wrong audience, expired,
+malformed) are logged too, as `verify_rejected` with the failure class and
+sanitised, clearly-labelled *claimed* identity hints (never the token). Because
+anyone can trigger them, they are rate-limited (burst 50, then about 5/s) and
+the next entry that gets through carries `suppressed=N`.
+
+`delcred audit` reads only the tail of the file (1 ms for the last 20 of
+100,000 entries; it used to read the whole file), and `audit verify` streams.
+`DELCRED_AUDIT_FSYNC=routine-off` skips the per-line `fsync` for `verify_*`
+events only (mints, denials and revocations always sync): faster on slow
+disks, but the last few verify lines can be lost in a power cut.
+
 A hash chain proves the log was not altered *in the middle*. It cannot by
 itself prove the newest lines were not cut off, or that someone with write
 access did not rewrite the entire file — anchor `audit head` outside the
 host (SIEM, ticket, commit) to cover that.
+`delcred audit checkpoint` prints a signed statement of "N entries, ending in
+this hash"; keep it off the host and later run
+`delcred audit verify --checkpoint-file cp.txt`: it fails if newer entries were
+cut off or the log was rewritten as a fresh consistent chain. It is signed by
+the issuer key, so someone who steals that key *and* the log can forge a newer
+checkpoint but not recreate one you already stored elsewhere. After a hard key
+rotation old checkpoints can no longer be verified; take a new one.
 
 ## How it compares
 
@@ -340,7 +399,7 @@ Statements below are limited to what each vendor's own page says (linked);
 | Per-operation scope check with MCP 401/403 challenges | yes (`delcred.mcp`) | — | policies per user + agent | — | per-tool scopes | — |
 | Credential injection proxy | yes (sidecar) | — | yes (MCP Identity Gateway) | — | — | — |
 | Tamper-evident (hash-chained) audit | yes | — | logs every request | near-real-time logging | — | audit devices (HMAC'd fields) |
-| Multi-agent chained delegation | **no** (single hop) | — | — | yes | — | — |
+| Multi-agent chained delegation | yes (attenuation-only, issuer-mediated, 4 hops max) | — | — | yes | — | — |
 
 ### Closer to the metal: token formats you can `pip install`
 
@@ -350,12 +409,20 @@ absolutes):
 
 | | delcred 0.4 | PyJWT EdDSA (plain JWT) | Biscuit (`biscuit-python`) | pymacaroons |
 |---|---|---|---|---|
-| Verify | 1,360/s full (signature, audience, scope, revocation, audit write); 7,700/s offline | 7,300/s | 7,450/s parse+authorize | 93,600/s (HMAC, issuer-only) |
-| Holder narrows a token offline | no (issuer-mediated) | no | **yes** (17,300/s) | **yes** |
+| Verify | 260/s full (signature, audience, scope, revocation, **fsynced** audit line), 1,000/s with `DELCRED_AUDIT_FSYNC=routine-off`; 4,100/s offline | 5,050/s | 7,640/s parse+authorize | 41,400/s (HMAC, issuer-only) |
+| Holder narrows a token offline | no (issuer-mediated) | no | **yes** (18,100/s) | **yes** |
 | Issuer enforces user/agent/scope policy, audit log, kill switches | **yes** | no | no (bring your own) | no |
 | Third-party verification without the secret | yes (JWKS + bulletin) | yes | yes | no |
 | Sender-constrained (key-bound) tokens | **yes** (DPoP) | DIY | DIY | DIY |
 | Token size, 1 hop / 2 hops | 541 / 604 bytes | n/a | 288 / 460 bytes | 220 bytes (3 caveats) |
+
+The numbers come from one shared Linux sandbox with slow `fsync` and noisy
+timing (the same run varied up to 2x), so only the ratios mean anything; the
+committed 0.4 numbers measured on a faster machine were about 4x higher for
+every row. Re-run `bench/run_bench.py` on your own hardware (it needs
+`pip install pymacaroons biscuit-python` for the last two columns).
+Biscuit's authorizer has a roughly 1 ms wall-clock limit, so the benchmark
+retries the occasional run that trips it on a loaded machine.
 
 Where they win: Biscuit and Macaroons let a *holder* attenuate with no round
 trip and carry richer logic ([Biscuit](https://github.com/eclipse-biscuit/biscuit-rust):
@@ -379,8 +446,9 @@ proof of absence). SPIRE/SPIFFE, WorkOS and Stytch were not evaluated.
 
 Where they are ahead: hosted platforms give you an admin UI, central
 multi-host revocation, IdP/SCIM integration, and (Auth0, Arcade) real OAuth
-connections to SaaS tools with refresh handling. Keycard handles
-multi-hop delegation and runtime attestation. Vault covers database and
+connections to SaaS tools with refresh handling. Keycard describes
+multi-hop delegation and runtime attestation (delcred's chains are
+issuer-mediated and narrow-only, with no runtime attestation). Vault covers database and
 cloud dynamic secrets. delcred is the small, auditable, zero-infrastructure
 option you can read in an afternoon and run on a laptop or inside one
 service.
@@ -446,7 +514,8 @@ service.
    append): 0.004 ms at 100,000 entries versus 173 ms in 0.3.0 (`bench/`).
    The index is per process and the files still grow without bound, so run
    `delcred prune`; signed bulletins list every live revocation and grow with it. Agent/user kill switches are permanent (there is
-   no un-revoke command yet).
+   no un-revoke command yet: restoring an agent while keeping its old tokens
+   dead needs a bulletin-format change, so it is not built).
 10. **Clock skew.** 60 s leeway is assumed.
 11. **Token `iss` is not a URL.** Tokens carry `iss: "delcred"` while the
     RFC 8414 metadata reports the server URL as `issuer`. OAuth clients that
@@ -454,6 +523,12 @@ service.
     resource servers using delcred (or `delcred_token_issuer` from the
     metadata) are unaffected. Changing `iss` would invalidate every existing
     token, so it is left for a deliberate major release.
+12. **Not tested here:** Windows (locking and the audit streaming reader are
+    written for it but only exercised on Linux), real IdPs, real TLS upstreams
+    through the sidecar (tests use loopback `http`), and multi-host setups.
+    The DPoP replay cache is still per process; `check_policy` does not apply
+    to opaque `dk_` keys; DPoP server nonces (RFC 9449 section 8) are not
+    implemented.
 
 ## Development
 
