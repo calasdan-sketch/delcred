@@ -61,6 +61,7 @@ __all__ = [
     "offline",
     "pop",
     "revoke_agent",
+    "revoke_presented",
     "revoke_token",
     "revoke_user",
     "trust_add",
@@ -76,7 +77,8 @@ def init(base: Path | None = None, force: bool = False) -> Path:
     from ._common import home as _home
     from .keys import key_paths
 
-    h = base or _home()
+    h = Path(base) if base else _home()
+    h.mkdir(mode=0o700, parents=True, exist_ok=True)  # `--home NEWDIR init` used to crash
     priv, _ = key_paths(h)
     if priv.exists() and not force:
         raise FileExistsError(f"issuer key already exists at {priv} (use force=True)")
@@ -211,6 +213,7 @@ def verify(
     dpop_proof: str | None = None,
     http_method: str | None = None,
     http_url: str | None = None,
+    check_policy: bool = False,
 ) -> dict[str, Any]:
     """Verify a delegation JWT (signature → expiry → audience → scope → [DPoP] → revocation).
 
@@ -228,7 +231,20 @@ def verify(
         dpop_proof=dpop_proof,
         http_method=http_method,
         http_url=http_url,
+        check_policy=check_policy,
     )
+
+
+def revoke_presented(token: str, base: Path | None = None) -> bool:
+    """End a delegation token from the holder's side (RFC 7009 semantics).
+
+    An agent that finished its task calls this so a copy that leaked later is
+    already dead. Returns False (and does nothing) for an invalid token.
+    """
+    from ._common import home as _home
+    from .exchange import revoke_presented as _rp
+
+    return _rp(token, base=base or _home())
 
 
 def verify_broker_key(

@@ -170,6 +170,35 @@ class Policy:
             raise PolicyError(str(e)) from e
         return grant
 
+    def still_granted(self, claims: dict) -> tuple[bool, str]:
+        """Does the CURRENT policy still allow what this delegation token says?
+
+        The root agent (first delegatee of the user) must still hold a grant
+        for ``(user, issuer)`` whose scopes and resources cover the token; a
+        sub-delegated agent must still be listed in ``delegate_to`` within
+        ``max_depth``. Used by ``verify(check_policy=True)``.
+        """
+        from .tokens import actor_chain, scopes_of, user_issuer
+
+        user = claims.get("sub")
+        actors = actor_chain(claims)
+        if not isinstance(user, str) or not actors:
+            return False, "token does not name a user and an agent"
+        grant = self.grant_for(user, actors[-1], user_issuer(claims))
+        if grant is None:
+            return False, f"no grant for user {user!r} and agent {actors[-1]!r}"
+        missing = scopes_of(claims) - grant.scopes
+        if missing:
+            return False, f"scope(s) no longer granted: {sorted(missing)}"
+        if claims.get("aud") not in grant.resources:
+            return False, "resource no longer granted"
+        if len(actors) > 1:
+            if len(actors) - 1 > min(grant.max_depth, MAX_CHAIN_DEPTH):
+                return False, "delegation depth no longer allowed"
+            if not set(actors[:-1]) <= grant.delegate_to:
+                return False, "sub-agent no longer listed in delegate_to"
+        return True, ""
+
     def effective_ttl(self, grant: Grant, requested_ttl: int) -> int:
         return max(1, min(requested_ttl, grant.max_ttl, MAX_TTL))
 
@@ -220,28 +249,129 @@ def _depth(g: dict) -> int:
     return min(raw, MAX_CHAIN_DEPTH)
 
 
+_GRANT_KEYS = {
+    "user", "agent", "scopes", "resources", "max_ttl", "single_use", "issuer",
+    "delegate_to", "max_depth",
+}
+
+
+def _str_list(g: dict, key: str, where: str) -> list[str]:
+    raw = g.get(key)
+    if raw is None:
+        return []
+    if not isinstance(raw, list) or not all(isinstance(x, str) and x for x in raw):
+        raise PolicyError(
+            f"{where}: '{key}' must be a list of non-empty strings (got {type(raw).__name__}); "
+            f"write {key}: [\"a\", \"b\"], not a bare string",
+            code="request",
+        )
+    return list(raw)
+
+
+def _grant_from(g: object, n: int) -> Grant:
+    where = f"policy.yaml grant #{n}"
+    if not isinstance(g, dict):
+        raise PolicyError(f"{where} must be a mapping", code="request")
+    for k in ("user", "agent"):
+        if not isinstance(g.get(k), (str, int)) or isinstance(g.get(k), bool) or g.get(k) == "":
+            raise PolicyError(f"{where}: '{k}' is required", code="request")
+    max_ttl = g.get("max_ttl", MAX_TTL)
+    if isinstance(max_ttl, bool) or not isinstance(max_ttl, int) or max_ttl <= 0:
+        raise PolicyError(f"{where}: max_ttl must be a positive integer (seconds)", code="request")
+    single = g.get("single_use", False)
+    if not isinstance(single, bool):
+        raise PolicyError(f"{where}: single_use must be true or false", code="request")
+    scopes = _str_list(g, "scopes", where)
+    for sc in scopes:
+        try:
+            parse_scope(sc)
+        except ValueError as e:
+            raise PolicyError(f"{where}: {e}", code="request") from e
+        if " " in sc:
+            raise PolicyError(f"{where}: scope {sc!r} contains a space", code="request")
+    return Grant(
+        user=str(g["user"]),
+        agent=str(g["agent"]),
+        scopes=set(scopes),
+        resources=_str_list(g, "resources", where),
+        max_ttl=max_ttl,
+        single_use=single,
+        issuer=str(g.get("issuer") or ISSUER_ID),
+        delegate_to=set(_str_list(g, "delegate_to", where)),
+        max_depth=_depth(g),
+    )
+
+
 def load(base: Path | None = None) -> Policy:
+    """Read ``policy.yaml``. Malformed input raises :class:`PolicyError`
+    (fail closed) instead of silently producing a different policy: a bare
+    string where a list belongs used to become a set of single characters."""
     p = policy_path(base)
     if not p.exists():
         p.write_text(default_policy())
-    data = yaml.safe_load(p.read_text()) or {}
-    grants = []
-    for g in data.get("grants", []) or []:
-        grants.append(
-            Grant(
-                user=str(g.get("user", "")),
-                agent=str(g.get("agent", "")),
-                scopes=set(g.get("scopes", []) or []),
-                resources=list(g.get("resources", []) or []),
-                max_ttl=int(g.get("max_ttl", MAX_TTL)),
-                single_use=bool(g.get("single_use", False)),
-                issuer=str(g.get("issuer") or ISSUER_ID),
-                delegate_to={str(a) for a in (g.get("delegate_to") or [])},
-                max_depth=_depth(g),
-            )
-        )
+    try:
+        data = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
+    except (yaml.YAMLError, UnicodeDecodeError) as e:
+        raise PolicyError(f"policy.yaml is not valid YAML: {type(e).__name__}", code="request") from e
+    if not isinstance(data, dict):
+        raise PolicyError("policy.yaml must be a mapping with a 'grants' list", code="request")
+    raw_grants = data.get("grants") or []
+    if not isinstance(raw_grants, list):
+        raise PolicyError("'grants' must be a list", code="request")
+    grants = [_grant_from(g, i) for i, g in enumerate(raw_grants, start=1)]
     return Policy(
         agents=data.get("agents", {}) or {},
         users=data.get("users", {}) or {},
         grants=grants,
     )
+
+
+def validate(base: Path | None = None) -> tuple[list[str], list[str]]:
+    """Lint ``policy.yaml``: returns ``(errors, warnings)``.
+
+    Errors are what ``load`` refuses. Warnings catch things that load fine but
+    are almost always mistakes: misspelled keys, duplicate grants (the FIRST
+    wins, later ones are dead), grants with no scopes/resources, wildcard-looking
+    scopes, plain-http or trailing-slash resources, agents not declared in
+    ``agents:``, and delegation targets without their own grant.
+    """
+    p = policy_path(base)
+    errors: list[str] = []
+    warnings: list[str] = []
+    try:
+        pol = load(base)
+        raw = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
+    except PolicyError as e:
+        return [str(e)], []
+    seen: dict[tuple[str, str, str], int] = {}
+    declared = set((raw.get("agents") or {}).keys()) if isinstance(raw.get("agents"), dict) else set()
+    for n, (g, rg) in enumerate(zip(pol.grants, raw.get("grants") or [], strict=True), start=1):
+        w = f"grant #{n} ({g.user} / {g.agent})"
+        for k in set(rg) - _GRANT_KEYS:
+            hint = " (did you mean 'scopes'?)" if k == "scope" else " (did you mean 'resources'?)" if k == "resource" else ""
+            warnings.append(f"{w}: unknown key '{k}' is ignored{hint}")
+        key = (g.user, g.agent, g.issuer)
+        if key in seen:
+            warnings.append(f"{w}: duplicates grant #{seen[key]}; only the first one is ever used")
+        seen.setdefault(key, n)
+        if not g.scopes:
+            warnings.append(f"{w}: no scopes, so it can never mint anything")
+        if not g.resources:
+            warnings.append(f"{w}: no resources, so it can never mint anything")
+        for sc in g.scopes:
+            if "*" in sc:
+                warnings.append(f"{w}: scope {sc!r} looks like a wildcard; scopes are matched exactly")
+        for r in g.resources:
+            if r.startswith("http://") and "localhost" not in r and "127.0.0.1" not in r:
+                warnings.append(f"{w}: resource {r!r} is plain http")
+            if r.endswith("/") and r.count("/") > 3:
+                warnings.append(f"{w}: resource {r!r} ends with '/'; matching is exact, clients must send it identically")
+            if "#" in r:
+                warnings.append(f"{w}: resource {r!r} has a fragment (RFC 8707 forbids it)")
+        if declared and g.agent not in declared:
+            warnings.append(f"{w}: agent is not listed under 'agents:'")
+        if g.delegate_to and g.max_depth == 0:
+            warnings.append(f"{w}: delegate_to is set but max_depth is 0")
+        if g.max_ttl > MAX_TTL:
+            warnings.append(f"{w}: max_ttl {g.max_ttl} exceeds the hard cap {MAX_TTL}; it will be clamped")
+    return errors, warnings

@@ -193,6 +193,7 @@ def authorize(
     dpop_proof: str | None = None,
     http_method: str | None = None,
     http_url: str | None = None,
+    check_policy: bool = False,
 ) -> AuthDecision:
     """Authorize one request. Never raises for bad credentials — returns a decision.
 
@@ -270,6 +271,7 @@ def authorize(
             dpop_proof=dpop_proof if scheme == "dpop" else None,
             http_method=http_method,
             http_url=http_url,
+            check_policy=check_policy,
         )
     except InsufficientScope as e:
         return deny(403, "insufficient_scope", "additional scope required", scope=e.required)

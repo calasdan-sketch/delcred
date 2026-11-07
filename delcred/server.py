@@ -79,7 +79,7 @@ _POLICY_TO_OAUTH = {
 # cannot be used to grow the revocation file with huge rows.
 MAX_ID_LEN = 256
 MAX_REASON_LEN = 512
-RATE_LIMITED_PATHS = frozenset({"/token", "/exchange", "/revoke"})
+RATE_LIMITED_PATHS = frozenset({"/token", "/exchange", "/revoke", "/oauth/revoke"})
 
 
 class RateLimiter:
@@ -137,6 +137,36 @@ class _Handler(BaseHTTPRequestHandler):
     def log_message(self, *a):  # keep stdout clean; audit log is the record
         pass
 
+    # Hosts this server answers to when it is bound to a loopback address.
+    # Without this check a web page can reach a localhost-only service through
+    # DNS rebinding (the browser thinks it is talking to evil.example, which
+    # now resolves to 127.0.0.1). ``None`` disables the check (bound to a
+    # non-loopback address: put your own proxy rules in front).
+    allowed_hosts: frozenset[str] | None = None
+
+    def _host_ok(self) -> bool:
+        if self.allowed_hosts is None:
+            return True
+        host = (self.headers.get("Host") or "").strip().lower()
+        if host.startswith("["):
+            name = host[1:].split("]")[0]
+        else:
+            name = host.rsplit(":", 1)[0] if host.count(":") == 1 else host
+        return name in self.allowed_hosts
+
+    def _browser_cross_site(self) -> bool:
+        """True when a browser says this request came from another site.
+
+        Non-browser clients send neither header. A web page cannot forge or
+        drop ``Sec-Fetch-Site``/``Origin``, so a state-changing call carrying
+        them is refused (CSRF: a page could otherwise POST to /revoke on the
+        user's machine as a loopback client).
+        """
+        site = (self.headers.get("Sec-Fetch-Site") or "").lower()
+        if site and site not in ("same-origin", "none"):
+            return True
+        return bool(self.headers.get("Origin")) and site != "same-origin"
+
     def _read_json(self) -> dict | None:
         """Read a JSON body. Returns None after responding with an error."""
         try:
@@ -187,6 +217,9 @@ class _Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
+        if not self._host_ok():
+            self._send(421, {"error": "unexpected Host header"})
+            return
         path = urlparse(self.path).path
         if path == "/health":
             self._send(200, {"status": "ok"})
@@ -227,6 +260,7 @@ class _Handler(BaseHTTPRequestHandler):
             "grant_types_supported": [GRANT_TOKEN_EXCHANGE],
             "dpop_signing_alg_values_supported": ["EdDSA"],
             "delcred_revocations_uri": u + "/revocations.jwt",
+            "revocation_endpoint": u + "/oauth/revoke",
             "token_endpoint_auth_methods_supported": ["none"],
             "response_types_supported": [],
             "delcred_token_issuer": _c.ISSUER_ID,
@@ -324,6 +358,12 @@ class _Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = urlparse(self.path).path
+        if not self._host_ok():
+            self._send(421, {"error": "unexpected Host header"})
+            return
+        if self._browser_cross_site():
+            self._send(403, {"error": "cross-site browser requests are refused"})
+            return
         if self._rate_limited(path):
             return
         if path == "/revoke" and not self._revoke_authorized():
@@ -412,6 +452,17 @@ class _Handler(BaseHTTPRequestHandler):
                     )
                     return
                 self._send(200, {"valid": True, "capability": rec})
+            elif path == "/oauth/revoke":
+                # RFC 7009: the HOLDER revokes its own token by presenting it.
+                # Always 200 (even for junk) so the endpoint is no oracle.
+                tok = body.get("token")
+                if not isinstance(tok, str) or not tok:
+                    self._send(400, {"error": "invalid_request", "error_description": "token is required"})
+                    return
+                from .exchange import revoke_presented
+
+                revoke_presented(tok, base=self.base)
+                self._send(200, {})
             elif path == "/revoke":
                 rl = RevocationList(self.base)
                 reason = body.get("reason", "") or ""
@@ -447,6 +498,18 @@ class _Handler(BaseHTTPRequestHandler):
             self._send(400, {"error": f"bad request: {type(e).__name__}"})
 
 
+def _allowed_hosts(bind_host: str, public_url: str | None) -> frozenset[str] | None:
+    """Host header names accepted by a loopback-bound server (None = any)."""
+    if not _is_loopback(bind_host) and bind_host != "localhost":
+        return None
+    names = {"localhost", "127.0.0.1", "::1", bind_host.lower()}
+    if public_url:
+        h = urlparse(public_url).hostname
+        if h:
+            names.add(h.lower())
+    return frozenset(names)
+
+
 def make_server(
     port: int = 8400,
     host: str = "127.0.0.1",
@@ -466,6 +529,7 @@ def make_server(
             "rate_limiter": RateLimiter(rate=rate) if rate > 0 else None,
             "admin_token": admin_token or os.environ.get("DELCRED_ADMIN_TOKEN") or None,
             "public_url": public_url,
+            "allowed_hosts": _allowed_hosts(host, public_url),
         },
     )
     httpd = ThreadingHTTPServer((host, port), handler)

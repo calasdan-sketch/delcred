@@ -135,3 +135,23 @@ def check_ttl(ttl: object) -> int:
     if ttl <= 0:
         raise ValueError("ttl must be positive")
     return ttl
+
+
+def safe_text(value: object, limit: int = 300) -> str:
+    """Render untrusted text for a terminal or log line.
+
+    Control, format (bidi, zero-width), separator, private-use and unassigned
+    characters become ``\\uXXXX`` escapes, so a hostile reason, scope or
+    resource string cannot move the cursor, retitle the window or reorder the
+    line. Output is cut at ``limit`` characters.
+    """
+    text = value if isinstance(value, str) else str(value)
+    out: list[str] = []
+    for ch in text[:limit]:
+        if unicodedata.category(ch)[0] in ("C", "Z") and ch != " ":
+            out.append(f"\\u{ord(ch):04x}" if ord(ch) <= 0xFFFF else f"\\U{ord(ch):08x}")
+        else:
+            out.append(ch)
+    if len(text) > limit:
+        out.append("...")
+    return "".join(out)

@@ -109,7 +109,11 @@ def normalize_htu(url: str) -> str:
 
 
 def access_token_hash(access_token: str) -> str:
-    return b64url_encode(hashlib.sha256(access_token.encode("ascii")).digest())
+    try:
+        raw = access_token.encode("ascii")
+    except UnicodeEncodeError as e:
+        raise PopError("access token is not ASCII") from e
+    return b64url_encode(hashlib.sha256(raw).digest())
 
 
 def make_proof(

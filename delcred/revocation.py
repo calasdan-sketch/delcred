@@ -22,7 +22,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from ._common import home
+from ._common import home, safe_text
 from ._lock import atomic_rewrite, file_lock
 
 # OS file locks are process-associated: two threads of the SAME process do
@@ -81,6 +81,8 @@ class RevocationList:
     # -- mutation (locked, atomic append) ---------------------------------
 
     def _append(self, entry: dict[str, Any]) -> None:
+        if isinstance(entry.get("reason"), str):
+            entry["reason"] = safe_text(entry["reason"], 512)  # no terminal escapes later
         with _thread_lock, file_lock(self.path), open(self.path, "ab+") as f:
             _heal_tail(f)
             f.write((json.dumps(entry) + "\n").encode("utf-8"))
@@ -132,6 +134,7 @@ class RevocationList:
         """
         with _thread_lock, file_lock(self.path), open(self.path, "ab+") as f:
             now = _now()
+            reason = safe_text(reason, 512)
             _heal_tail(f)
             idx = self._refresh(f)  # amortised O(new bytes), not O(file)
             for exp, _ in idx.jti.get(jti, ()):

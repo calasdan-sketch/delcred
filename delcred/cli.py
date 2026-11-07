@@ -11,6 +11,7 @@ from pathlib import Path
 import delcred
 from delcred import keys as _keys
 from delcred._common import home as _home
+from delcred._common import safe_text as _st
 from delcred.audit import AuditLog
 from delcred.broker import Broker, BrokerError
 from delcred.exchange import TOKEN_TYPE_BROKER_KEY, ExchangeError
@@ -79,7 +80,7 @@ def cmd_offline_verify(args):
         c = v.claims
         print(f"VALID  sub={c['sub']} act={c['act']['sub']} scope={c['scope']!r} aud={c['aud']}")
         return
-    print(f"INVALID: {v.code}: {v.detail}", file=sys.stderr)
+    print(f"INVALID: {_st(v.code)}: {_st(v.detail)}", file=sys.stderr)
     sys.exit(5 if v.code == "insufficient_scope" else 4)
 
 
@@ -167,7 +168,7 @@ def cmd_exchange(args):
             base=_base(args),
         )
     except (ExchangeError, PolicyError) as e:
-        print(f"exchange denied: {e}", file=sys.stderr)
+        print(f"exchange denied: {_st(e)}", file=sys.stderr)
         sys.exit(3)
     if args.quiet_claims:
         print(result.credential)
@@ -188,12 +189,13 @@ def cmd_verify(args):
             expected_resource=args.resource,
             required_scopes=args.require_scope or None,
             base=_base(args),
+            check_policy=args.check_policy,
         )
     except InsufficientScope as e:
-        print(f"INSUFFICIENT_SCOPE: missing {' '.join(e.missing)}", file=sys.stderr)
+        print(f"INSUFFICIENT_SCOPE: missing {_st(' '.join(e.missing))}", file=sys.stderr)
         sys.exit(5)
     except (TokenError, ExchangeError) as e:
-        print(f"INVALID: {e}", file=sys.stderr)
+        print(f"INVALID: {_st(e)}", file=sys.stderr)
         sys.exit(4)
     if args.json:
         print(json.dumps(claims, indent=2, default=str))
@@ -219,7 +221,7 @@ def cmd_broker_redeem(args):
             required_scopes=args.require_scope or None,
         )
     except BrokerError as e:
-        print(f"REJECTED: {e}", file=sys.stderr)
+        print(f"REJECTED: {_st(e)}", file=sys.stderr)
         sys.exit(4)
     print(json.dumps(rec, indent=2))
 
@@ -227,6 +229,14 @@ def cmd_broker_redeem(args):
 def cmd_revoke(args):
     h = _base(args)
     rl = RevocationList(h)
+    if args.token_file:
+        from delcred.exchange import revoke_presented
+
+        done = revoke_presented(_read_file_secret(args.token_file), base=h)
+        print("revoked the presented token" if done else "token not valid (nothing revoked)")
+        if not done:
+            sys.exit(1)
+        return
     if args.jti:
         rl.revoke_jti(args.jti, reason=args.reason, expires_at=None)
         AuditLog(h).record("token_revoked", jti=args.jti, reason=args.reason)
@@ -239,7 +249,7 @@ def cmd_revoke(args):
         scope_ = f" from issuer {args.issuer}" if args.issuer else " (every issuer)"
         print(f"revoked ALL delegations by user {args.user!r}{scope_}")
     else:
-        print("nothing to revoke: need one of --jti, --agent, --user", file=sys.stderr)
+        print("nothing to revoke: need one of --jti, --agent, --user, --token-file", file=sys.stderr)
         sys.exit(2)
 
 
@@ -248,10 +258,25 @@ def cmd_policy_check(args):
     try:
         grant = pol.check(args.user, args.agent, args.scope, args.resource, args.ttl)
     except PolicyError as e:
-        print(f"DENIED: {e}", file=sys.stderr)
+        print(f"DENIED: {_st(e)}", file=sys.stderr)
         sys.exit(3)
     ttl = pol.effective_ttl(grant, args.ttl)
     print(f"ALLOWED  ttl={ttl}s scopes={sorted(grant.scopes)}")
+
+
+def cmd_policy_validate(args):
+    from delcred.policy import validate
+
+    errors, warnings = validate(_base(args))
+    for e in errors:
+        print(f"ERROR: {_st(e, 600)}", file=sys.stderr)
+    for w in warnings:
+        print(f"warning: {_st(w, 600)}", file=sys.stderr)
+    if errors:
+        sys.exit(3)
+    print(f"policy OK ({len(warnings)} warning(s))")
+    if warnings and args.strict:
+        sys.exit(1)
 
 
 def cmd_status(args):
@@ -284,7 +309,7 @@ def cmd_trust_add(args):
             args.iss, args.key_file, base=_base(args), audience=args.audience
         )
     except TrustConfigError as e:
-        print(f"trust-add failed: {e}", file=sys.stderr)
+        print(f"trust-add failed: {_st(e)}", file=sys.stderr)
         sys.exit(3)
     print(f"trusted issuer {args.iss} -> {dest}")
     print("subject tokens from this issuer are now accepted in exchanges")
@@ -292,19 +317,35 @@ def cmd_trust_add(args):
 
 def cmd_audit(args):
     log = AuditLog(_base(args))
+    if args.action == "checkpoint":
+        try:
+            print(log.checkpoint())
+        except ValueError as e:
+            print(f"cannot checkpoint: {_st(e)}", file=sys.stderr)
+            sys.exit(6)
+        print("# store this line OFF this host; verify later with: audit verify --checkpoint-file FILE", file=sys.stderr)
+        return
     if args.action == "verify":
-        res = log.verify()
+        cp = _read_file_secret(args.checkpoint_file) if args.checkpoint_file else None
+        try:
+            res = log.verify(checkpoint=cp)
+        except ValueError as e:
+            print(f"TAMPERED  checkpoint unusable: {_st(e)}", file=sys.stderr)
+            sys.exit(6)
         if res.ok:
             print(
                 f"OK  {res.chained} hash-chained entries"
                 + (f" (+{res.legacy} legacy, pre-0.3, unchained)" if res.legacy else "")
                 + f"\nhead {res.head}"
             )
-            print("Anchor the head hash outside this host to also detect truncation.")
+            if cp:
+                print("matches the signed checkpoint: nothing before it was cut off or rewritten.")
+            else:
+                print("Anchor the head hash (or `audit checkpoint`) outside this host to also detect truncation.")
             return
         print(f"TAMPERED  {len(res.problems)} problem(s):", file=sys.stderr)
         for prob in res.problems[:50]:
-            print(f"  {prob}", file=sys.stderr)
+            print(f"  {_st(prob, 400)}", file=sys.stderr)
         sys.exit(6)
     if args.action == "head":
         print(log.head())
@@ -376,7 +417,7 @@ def cmd_mcp_headers(args):
             base=_base(args),
         )
     except (ExchangeError, PolicyError) as e:
-        print(f"delcred: delegation denied for {resource}: {e}", file=sys.stderr)
+        print(f"delcred: delegation denied for {_st(resource)}: {_st(e)}", file=sys.stderr)
         sys.exit(3)
     # stdout carries ONLY the JSON object Claude Code parses.
     sys.stdout.write(json.dumps({"Authorization": f"Bearer {result.credential}"}))
@@ -518,6 +559,11 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="SCOPE",
         help="scope this operation needs (repeatable); exit 5 if missing",
     )
+    s.add_argument(
+        "--check-policy",
+        action="store_true",
+        help="also refuse tokens whose grant was removed/narrowed in policy.yaml since minting",
+    )
     s.add_argument("--json", action="store_true")
     s.set_defaults(func=cmd_verify)
 
@@ -541,6 +587,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--issuer", help="with --user: only that IdP's user (default: the id under every issuer)"
     )
     s.add_argument("--reason", default="")
+    s.add_argument(
+        "--token-file",
+        help="revoke the delegation token in this file (what a holder does when its task is done)",
+    )
     s.set_defaults(func=cmd_revoke)
 
     s = sub.add_parser("policy", help="policy operations")
@@ -553,6 +603,10 @@ def build_parser() -> argparse.ArgumentParser:
     c.add_argument("--ttl", type=int, default=900)
     c.set_defaults(func=cmd_policy_check)
 
+    c = ps.add_parser("validate", help="lint policy.yaml: types, typos, duplicate grants")
+    c.add_argument("--strict", action="store_true", help="exit 1 on warnings too")
+    c.set_defaults(func=cmd_policy_validate)
+
     s = sub.add_parser("status", help="show home/policy/revocation state")
     s.set_defaults(func=cmd_status)
 
@@ -562,7 +616,8 @@ def build_parser() -> argparse.ArgumentParser:
         description="audit [show]: recent events; audit verify: check the hash "
         "chain (exit 6 if tampered); audit head: print the newest hash to anchor.",
     )
-    s.add_argument("action", nargs="?", default="show", choices=["show", "verify", "head"])
+    s.add_argument("action", nargs="?", default="show", choices=["show", "verify", "head", "checkpoint"])
+    s.add_argument("--checkpoint-file", help="with verify: a signed checkpoint from `audit checkpoint`")
     s.add_argument("--tail", type=int, default=20)
     s.add_argument("--event", help="only this event type, e.g. token_issued")
     s.add_argument("--agent")
@@ -679,7 +734,11 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv=None):
     args = build_parser().parse_args(argv)
-    args.func(args)
+    try:
+        args.func(args)
+    except PolicyError as e:  # e.g. a malformed policy.yaml: say so, no traceback
+        print(f"policy error: {_st(e, 600)}", file=sys.stderr)
+        sys.exit(3)
 
 
 if __name__ == "__main__":

@@ -34,6 +34,49 @@ from .policy import PolicyError
 from .revocation import RevocationList
 from .tokens import ExpiredToken, InvalidToken, TokenError, verify_signature
 
+MAX_REQUEST_BYTES = 16 * 1024 * 1024
+MAX_RESPONSE_BYTES = 32 * 1024 * 1024
+# Credentials and hop-by-hop headers are never forwarded from the caller; the
+# sidecar sets Authorization itself.
+_DROP_REQUEST_HEADERS = frozenset(
+    {
+        "host", "content-length", "x-delcred-upstream", "proxy-connection", "connection",
+        "authorization", "proxy-authorization", "transfer-encoding", "te", "upgrade",
+        "keep-alive", "expect",
+    }
+)
+_DROP_RESPONSE_HEADERS = frozenset(
+    {"content-length", "transfer-encoding", "connection", "keep-alive", "upgrade"}
+)
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Never follow a redirect: the bearer token must not leave the upstream
+    the operator allowlisted. The 3xx response goes back to the caller."""
+
+    def redirect_request(self, *a, **kw):
+        return None
+
+
+def _opener() -> urllib.request.OpenerDirector:
+    """Only http(s) (urllib would otherwise also open file:// and ftp:// URLs),
+    no redirects. Proxy settings come from the environment, as before."""
+    return urllib.request.build_opener(
+        urllib.request.ProxyHandler(),
+        urllib.request.HTTPHandler(),
+        urllib.request.HTTPSHandler(),
+        _NoRedirect(),
+    )
+
+
+def _is_loopback_host(target: str) -> bool:
+    host = target.rsplit("@", 1)[-1]
+    if host.startswith("["):
+        host = host[1:].split("]")[0]
+    else:
+        host = host.split(":")[0]
+    return host == "localhost" or host in ("127.0.0.1", "::1")
+
 
 class _CacheEntry:
     def __init__(self, credential: str, expires_at: int, kind: str = "jwt"):
@@ -115,54 +158,67 @@ class _ProxyHandler(BaseHTTPRequestHandler):
         return result.credential
 
     def _proxy(self):
-        target = self.headers.get("X-Delcred-Upstream") or urlparse(self.path).netloc
+        # The upstream is chosen ONLY from the allowlist. The caller (an agent
+        # that may be prompt-injected) can never steer the credential to a
+        # host of its own choosing: an absolute-form request line must name
+        # the same host as the allowlisted target, and redirects are not
+        # followed (a 3xx is handed back to the caller without the token).
+        parsed = urlparse(self.path)
+        header_target = self.headers.get("X-Delcred-Upstream")
+        target = (header_target or parsed.netloc or "").lower()
         if not target or target not in self.mapping:
             self.send_error(403, "upstream not allowlisted in sidecar mapping")
+            return
+        if parsed.netloc and parsed.netloc.lower() != target:
+            self.send_error(400, "request URL host does not match the allowlisted upstream")
+            return
+        scheme = (parsed.scheme or "https").lower()
+        if scheme not in ("https", "http") or (scheme == "http" and not _is_loopback_host(target)):
+            self.send_error(400, "only https upstreams are allowed (http for loopback only)")
+            return
+        try:
+            length = int(self.headers.get("Content-Length", 0) or 0)
+        except ValueError:
+            self.send_error(400, "bad Content-Length")
+            return
+        if length < 0 or length > MAX_REQUEST_BYTES:
+            self.send_error(413, "request body too large")
             return
         try:
             credential = self._credential_for(target)
         except (ExchangeError, PolicyError, TokenError, ValueError) as e:
-            # policy denial etc. → 403, never leak internals
+            # policy denial etc. -> 403, never leak internals
             self.send_error(403, f"delegation failed: {type(e).__name__}")
             return
-        length = int(self.headers.get("Content-Length", 0) or 0)
         body = self.rfile.read(length) if length else None
-        # Rebuild the upstream URL: path may be origin-form (proxy request).
-        parsed = urlparse(self.path)
-        if parsed.scheme:
-            url = self.path
-        else:
-            url = f"https://{target}{parsed.path}"
-            if parsed.query:
-                url += "?" + parsed.query
+        url = f"{scheme}://{target}{parsed.path or '/'}"
+        if parsed.query:
+            url += "?" + parsed.query
         req = urllib.request.Request(url, data=body, method=self.command)
         for k, v in self.headers.items():
-            kl = k.lower()
-            if kl in (
-                "host",
-                "content-length",
-                "x-delcred-upstream",
-                "proxy-connection",
-                "connection",
-            ):
+            if k.lower() in _DROP_REQUEST_HEADERS:
                 continue
             req.add_header(k, v)
         req.add_header("Authorization", f"Bearer {credential}")
         try:
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                data = resp.read()
-                self.send_response(resp.status)
+            try:
+                resp = _opener().open(req, timeout=30)
+            except urllib.error.HTTPError as e:  # 4xx/5xx/3xx: pass through
+                resp = e
+            with resp:
+                data = resp.read(MAX_RESPONSE_BYTES + 1)
+                if len(data) > MAX_RESPONSE_BYTES:
+                    self.send_error(502, "upstream response too large")
+                    return
+                self.send_response(resp.status if resp.status else resp.code)
                 for k, v in resp.headers.items():
-                    if k.lower() not in (
-                        "content-length",
-                        "transfer-encoding",
-                        "connection",
-                    ):
+                    if k.lower() not in _DROP_RESPONSE_HEADERS:
                         self.send_header(k, v)
                 self.send_header("Content-Length", str(len(data)))
                 self.end_headers()
-                self.wfile.write(data)
-        except (OSError, urllib.error.URLError) as e:
+                if self.command != "HEAD":
+                    self.wfile.write(data)
+        except (OSError, urllib.error.URLError, ValueError) as e:
             self.send_error(502, f"upstream error: {type(e).__name__}")
 
     do_GET = _proxy
@@ -170,6 +226,8 @@ class _ProxyHandler(BaseHTTPRequestHandler):
     do_PUT = _proxy
     do_PATCH = _proxy
     do_DELETE = _proxy
+    do_HEAD = _proxy
+    do_OPTIONS = _proxy
 
 
 def run_sidecar(
@@ -181,7 +239,7 @@ def run_sidecar(
     base: Path | None = None,
 ) -> None:
     base = base or _c.home()
-    _ProxyHandler.mapping = mapping or {}
+    _ProxyHandler.mapping = {k.lower(): v for k, v in (mapping or {}).items()}
     _ProxyHandler.user_token = user_token
     _ProxyHandler.agent_token = agent_token
     _ProxyHandler.base = base
