@@ -42,6 +42,7 @@ from ._jws import (
     b64url_encode,
     check_header,
     ed25519_verify,
+    is_safe_int,
     parse_compact,
     sign_compact,
 )
@@ -220,7 +221,7 @@ def verify_proof(
         raise PopError("DPoP proof htm does not match the request method")
     if not isinstance(htu, str) or normalize_htu(htu) != normalize_htu(url):
         raise PopError("DPoP proof htu does not match the request URL")
-    if isinstance(iat, bool) or not isinstance(iat, int):
+    if not is_safe_int(iat):
         raise PopError("DPoP proof iat missing")
     if iat < t - PROOF_MAX_AGE or iat > t + PROOF_LEEWAY:
         raise PopError("DPoP proof is outside the acceptable time window")

@@ -12,8 +12,12 @@ const B64URL = /^[A-Za-z0-9_-]*$/;
 const BULLETIN_TYP = "delcred-rev+jwt";
 
 class Reject extends Error {}
-const isInt = (v) => typeof v === "number" && Number.isInteger(v);
-const isObj = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
+// Integers are JSON integer lexemes (no ".", "e" or "E") within +-(2^53 - 1).
+// strictParse() turns every other number into a Float marker so that 5.0 and 1e3 are not integers.
+const MAX_DEPTH = 32;
+class Float { constructor(v) { this.v = v; } }
+const isInt = (v) => typeof v === "number" && Number.isSafeInteger(v);
+const isObj = (v) => v !== null && typeof v === "object" && !Array.isArray(v) && !(v instanceof Float);
 const nonEmptyStr = (v) => typeof v === "string" && v.length > 0;
 
 function b64(s) {
@@ -22,9 +26,62 @@ function b64(s) {
   if (buf.toString("base64url") !== s) throw new Reject("segment is not canonical base64url");
   return buf;
 }
+// Minimal strict RFC 8259 parser: rejects duplicate members, NaN/Infinity, trailing data;
+// non-integer number lexemes become Float markers. Recursion depth is capped.
+function strictParse(text) {
+  let i = 0;
+  const ws = () => { while (i < text.length && " \t\n\r".includes(text[i])) i++; };
+  const fail = () => { throw new Error("bad json"); };
+  function value(depth) {
+    if (depth > MAX_DEPTH) fail();
+    ws();
+    const c = text[i];
+    if (c === "{") {
+      i++; const o = Object.create(null); ws();
+      if (text[i] === "}") { i++; return o; }
+      for (;;) {
+        ws(); if (text[i] !== '"') fail();
+        const k = str(); if (k in o) fail();
+        ws(); if (text[i++] !== ":") fail();
+        o[k] = value(depth + 1); ws();
+        if (text[i] === ",") { i++; continue; }
+        if (text[i++] === "}") return o;
+        fail();
+      }
+    }
+    if (c === "[") {
+      i++; const a = []; ws();
+      if (text[i] === "]") { i++; return a; }
+      for (;;) {
+        a.push(value(depth + 1)); ws();
+        if (text[i] === ",") { i++; continue; }
+        if (text[i++] === "]") return a;
+        fail();
+      }
+    }
+    if (c === '"') return str();
+    for (const [lit, v] of [["true", true], ["false", false], ["null", null]]) {
+      if (text.startsWith(lit, i)) { i += lit.length; return v; }
+    }
+    const m = /^-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?/.exec(text.slice(i, i + 400));
+    if (!m) fail();
+    i += m[0].length;
+    const n = Number(m[0]);
+    return (m[2] || m[3] || !Number.isSafeInteger(n)) ? new Float(n) : n;
+  }
+  function str() {
+    const m = /^"((?:[^"\\\u0000-\u001f]|\\(?:["\\/bfnrt]|u[0-9a-fA-F]{4}))*)"/.exec(text.slice(i));
+    if (!m) fail();
+    i += m[0].length;
+    return JSON.parse(m[0]);
+  }
+  const v = value(0); ws();
+  if (i !== text.length) fail();
+  return v;
+}
 function jsonObj(buf, what) {
   let o;
-  try { o = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(buf)); }
+  try { o = strictParse(new TextDecoder("utf-8", { fatal: true }).decode(buf)); }
   catch { throw new Reject(`${what} is not valid UTF-8 JSON`); }
   if (!isObj(o)) throw new Reject(`${what} is not a JSON object`);
   return o;
@@ -121,7 +178,7 @@ function verifyProof(proof, { method, url, accessToken, expectedJkt, now, cache 
 function checkBulletin(b, jwks, now, maxAge, leeway) {
   const { header, payload: p, input, sig } = parseCompact(b);
   checkHeader(header);
-  if (String(header.typ ?? "").toLowerCase() !== BULLETIN_TYP) throw new Reject("bulletin typ");
+  if ((typeof header.typ === "string" ? header.typ : "").toLowerCase() !== BULLETIN_TYP) throw new Reject("bulletin typ");
   const x = jwkFor(jwks, header.kid);
   if (!x || !edVerify(x, input, sig)) throw new Reject("bulletin signature");
   if (p.iss !== "delcred") throw new Reject("bulletin issuer");
@@ -141,7 +198,7 @@ export function verifyOffline(token, o) {
   let header, claims, input, sig;
   try { ({ header, payload: claims, input, sig } = parseCompact(token)); checkHeader(header); }
   catch (e) { if (e instanceof Reject) return fail("invalid_token", e.message); throw e; }
-  if (!["at+jwt", "application/at+jwt"].includes(String(header.typ ?? "").toLowerCase())) return fail("invalid_token", "typ");
+  if (!["at+jwt", "application/at+jwt"].includes((typeof header.typ === "string" ? header.typ : "").toLowerCase())) return fail("invalid_token", "typ");
   const x = jwkFor(o.jwks, header.kid);
   if (!x) return fail("invalid_token", "kid not in JWKS");
   if (!edVerify(x, input, sig)) return fail("invalid_token", "signature");
@@ -153,7 +210,7 @@ export function verifyOffline(token, o) {
   if (claims.kind !== "delegation") return fail("invalid_token", "kind");
   const acts = actors(claims);
   if (!acts || !nonEmptyStr(claims.sub) || !nonEmptyStr(claims.jti)) return fail("invalid_token", "sub/act/jti");
-  const chain = claims.chain ?? [];
+  const chain = "chain" in claims ? claims.chain : [];
   if (!Array.isArray(chain) || chain.length !== acts.length - 1 || !chain.every(nonEmptyStr)) return fail("invalid_token", "chain");
   const hasCnf = "cnf" in claims;
   if (hasCnf && !(isObj(claims.cnf) && Object.keys(claims.cnf).length === 1 && nonEmptyStr(claims.cnf.jkt))) return fail("invalid_token", "cnf");

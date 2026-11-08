@@ -39,7 +39,7 @@ Issues = "https://github.com/calasdan-sketch/delcred/issues"
 Changelog = "https://github.com/calasdan-sketch/delcred/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
-dev = ["pytest>=8"]
+dev = ["pytest>=8", "hypothesis>=6"]
 
 [project.scripts]
 delcred = "delcred.cli:main"

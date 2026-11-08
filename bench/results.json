@@ -3,27 +3,27 @@
   "platform": "Linux x86_64",
   "delcred": {
     "version": "0.4.0",
-    "mint_per_s": 253.21089904378826,
-    "verify_full_per_s": 221.23612789744814,
-    "verify_signature_only_per_s": 2798.058376927767,
+    "mint_per_s": 120.3212957367586,
+    "verify_full_per_s": 170.5974605692173,
+    "verify_signature_only_per_s": 666.6682844482893,
     "token_bytes": 541,
-    "verify_check_policy_per_s": 604.9181344529636,
-    "verify_full_audit_fsync_routine_off_per_s": 2549.609895024915,
-    "verify_rejected_per_s": 3142.9616328592792,
-    "audit_tail20_ms_at_100k": 3.05,
-    "audit_verify_s_at_100k": 1.15,
+    "verify_check_policy_per_s": 171.20542169493936,
+    "verify_full_audit_fsync_routine_off_per_s": 1056.5656101695279,
+    "verify_rejected_per_s": 806.4443722467826,
+    "audit_tail20_ms_at_100k": 1.21,
+    "audit_verify_s_at_100k": 3.97,
     "revocation_check_ms": {
       "1000": 0.003,
       "10000": 0.003,
-      "100000": 0.002
+      "100000": 0.003
     },
-    "single_use_burn_per_s_at_100k": 297.42345334019757,
-    "attenuate_per_s": 155.27767184175528,
+    "single_use_burn_per_s_at_100k": 338.7479100382885,
+    "attenuate_per_s": 111.61488937891403,
     "chained_token_bytes": 604,
-    "offline_verify_per_s": 3089.0969959073673,
-    "offline_verify_with_bulletin_per_s": 1563.5704716495597,
-    "dpop_make_proof_per_s": 9300.961901761273,
-    "dpop_verify_per_s": 5835.334266211854,
+    "offline_verify_per_s": 1861.466678858499,
+    "offline_verify_with_bulletin_per_s": 895.1025539672777,
+    "dpop_make_proof_per_s": 6199.193656003772,
+    "dpop_verify_per_s": 1609.0107726897807,
     "escalation_fuzz": {
       "attempts": 3000,
       "minted": 57,
@@ -33,20 +33,20 @@
   },
   "competitors": {
     "pyjwt_eddsa": {
-      "sign_per_s": 14794.274663064727,
-      "verify_per_s": 7708.382357573304,
+      "sign_per_s": 4278.208279300123,
+      "verify_per_s": 1173.8130763509698,
       "note": "plain signed JWT: no agent identity, no delegation, no revocation, no audit"
     },
     "pymacaroons": "not installed",
     "biscuit_python": "not installed"
   },
   "cross_language": {
-    "cases": 89,
+    "cases": 96,
     "python": {
-      "pass": 89,
-      "ms": 14.7
+      "pass": 96,
+      "ms": 93.2
     },
-    "node": "node: 89/89 vectors pass (22.4 ms)",
-    "go": "go: 89/89 vectors pass (8.0 ms)"
+    "node": "node: 96/96 vectors pass (156.8 ms)",
+    "go": "go: 96/96 vectors pass (49.5 ms)"
   }
 }

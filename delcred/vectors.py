@@ -91,6 +91,13 @@ def _proof(token: str, *, method="GET", url=RES + "/invoices", jti="proof-0001",
     return sign_compact({"typ": typ, "alg": "EdDSA", "jwk": _pop.public_jwk(key)}, claims, key)
 
 
+def _raw_signed(payload_json: str, header: dict | None = None, key: Ed25519PrivateKey = ISSUER_KEY) -> str:
+    """Sign hand-written payload JSON text (for lexemes json.dumps cannot produce)."""
+    h = b64url_encode(json.dumps(header or _hdr(), sort_keys=True, separators=(",", ":")).encode())
+    p = b64url_encode(payload_json.encode())
+    return f"{h}.{p}.{b64url_encode(key.sign(f'{h}.{p}'.encode('ascii')))}"
+
+
 def _forge(header: dict, payload: dict, sig: bytes = b"") -> str:
     h = b64url_encode(json.dumps(header, sort_keys=True, separators=(",", ":")).encode())
     p = b64url_encode(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode())
@@ -188,6 +195,21 @@ def build() -> dict[str, Any]:
     case("missing_jti", _tok(_claims(jti=None)), "invalid_token", why="jti required (revocation handle)")
     case("exp_as_string", _tok(_claims(exp="1800000840")), "invalid_token", why="exp must be an integer")
     case("exp_as_float", _tok(_claims(exp=1800000840.5)), "invalid_token", why="NumericDate must be an integer in delcred")
+    _good = json.dumps(_claims(), sort_keys=True, separators=(",", ":"))
+    case("exp_integer_valued_float", _raw_signed(_good.replace('"exp":1800000840', '"exp":1800000840.0')), "invalid_token",
+         why="1800000840.0 is a float even though its value is whole; only integer lexemes are NumericDates")
+    case("exp_exponent_notation", _raw_signed(_good.replace('"exp":1800000840', '"exp":1.800000840e9')), "invalid_token",
+         why="exponent notation is a float, not an integer")
+    case("exp_beyond_2_53", _raw_signed(_good.replace('"exp":1800000840', '"exp":9223372036854775808')), "invalid_token",
+         why="integers above 2^53-1 are not exactly representable in every language (Go int64 vs JS double)")
+    case("payload_duplicate_member", _raw_signed(_good.replace('"exp":1800000840', '"exp":1,"exp":1800000840')), "invalid_token",
+         why="duplicate JSON members are ambiguous (languages keep first or last)")
+    case("payload_nan_literal", _raw_signed(_good.replace('"exp":1800000840', '"exp":NaN')), "invalid_token",
+         why="NaN/Infinity are not JSON")
+    case("payload_too_deeply_nested", _raw_signed(_good[:-1] + ',"x":' + "[" * 40 + "]" * 40 + "}"), "invalid_token",
+         why="nesting deeper than 32 levels is refused")
+    case("chain_null_explicit", _raw_signed(_good[:-1] + ',"chain":null}'), "invalid_token",
+         why="chain, when present, must be a list; null is not a list")
     case("exp_missing", _tok(_claims(exp=None)), "invalid_token", why="exp required")
     case("chain_length_mismatch", _tok(_claims(act={"sub": "b", "act": {"sub": "a"}}, chain=[])), "invalid_token",
          why="chain must list one ancestor jti per extra actor")

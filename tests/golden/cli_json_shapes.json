@@ -1,0 +1,50 @@
+{
+  "audit_verify": {
+    "chained": "int",
+    "checkpoint_matched": "bool",
+    "head": "str",
+    "legacy": "int",
+    "ok": "bool",
+    "problems": []
+  },
+  "doctor": {
+    "checks": [
+      {
+        "check": "str",
+        "detail": "str",
+        "level": "str"
+      }
+    ],
+    "ok": "bool"
+  },
+  "status": {
+    "agents": "int",
+    "broker_records": "int",
+    "grants": "int",
+    "home": "str",
+    "issuer_key_present": "bool",
+    "revocation_entries": "int",
+    "trusted_issuers": "int",
+    "users": "int"
+  },
+  "verify_denied": {
+    "code": "str",
+    "detail": "str",
+    "valid": "bool"
+  },
+  "verify_ok": {
+    "act": {
+      "sub": "str"
+    },
+    "aud": "str",
+    "exp": "int",
+    "iat": "int",
+    "iss": "str",
+    "jti": "str",
+    "kind": "str",
+    "nbf": "int",
+    "scope": "str",
+    "sub": "str",
+    "user_iss": "str"
+  }
+}

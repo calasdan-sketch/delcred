@@ -31,7 +31,7 @@ from typing import Any, TypeGuard
 
 from . import pop as _pop
 from ._common import CLOCK_SKEW_LEEWAY, ISSUER_ID, MAX_CHAIN_DEPTH, parse_scope
-from ._jws import JWSError, check_header, ed25519_verify, parse_compact
+from ._jws import JWSError, check_header, ed25519_verify, is_safe_int, parse_compact
 
 BULLETIN_TYP = "delcred-rev+jwt"
 BULLETIN_MAX_AGE = 300
@@ -83,7 +83,7 @@ def _verify_jws(token: str, jwks: Any, typ: set[str]) -> tuple[dict, dict]:
 
 
 def _int(v: Any) -> TypeGuard[int]:
-    return isinstance(v, int) and not isinstance(v, bool)
+    return is_safe_int(v)
 
 
 def check_bulletin(

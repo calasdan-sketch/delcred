@@ -355,7 +355,10 @@ class AuditLog:
                     legacy_digest = hashlib.sha256(line.encode()).hexdigest()
                     continue
                 res.ok = False
-                res.problems.append(f"line {lineno}: unhashed entry inside the chain")
+                res.problems.append(
+                    f"line {lineno}: unhashed entry inside the chain (log padded by hand, or a delcred older "
+                    "than 0.3 is still writing to this home - stop old processes before upgrading)"
+                )
                 prev = hashlib.sha256(line.encode()).hexdigest()
                 continue
             res.chained += 1

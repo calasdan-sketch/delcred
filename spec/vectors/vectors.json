@@ -873,6 +873,125 @@
    "expect": [
     "invalid_token"
    ],
+   "name": "exp_integer_valued_float",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAuMCwiaWF0IjoxNzk5OTk5OTQwLCJpc3MiOiJkZWxjcmVkIiwianRpIjoianRpLTAwMDEiLCJraW5kIjoiZGVsZWdhdGlvbiIsIm5iZiI6MTc5OTk5OTk0MCwic2NvcGUiOiJjdXN0b21lcnM6cmVhZCBpbnZvaWNlczpyZWFkIiwic3ViIjoidV9hbGljZSIsInVzZXJfaXNzIjoiZGVsY3JlZCJ9.PPx8O0JINPnk2S2N783O9ifsoRHNL9Q7BjPbUsDDItGSxfZfzHH2i4U4ePfEnlQxPqQENWPVeDB_ctM_tyCGAw",
+   "why": "1800000840.0 is a float even though its value is whole; only integer lexemes are NumericDates"
+  },
+  {
+   "expect": [
+    "invalid_token"
+   ],
+   "name": "exp_exponent_notation",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjEuODAwMDAwODQwZTksImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.bOB3jbgvI3k7quKwejGjxRKJXPRyTdjxvs5brYbtAPwruXpHkuOPilo5OfDtMSVayQ0isqDf1JzN0iyXTa9bBQ",
+   "why": "exponent notation is a float, not an integer"
+  },
+  {
+   "expect": [
+    "invalid_token"
+   ],
+   "name": "exp_beyond_2_53",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjkyMjMzNzIwMzY4NTQ3NzU4MDgsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQifQ.HhR4jLLsA4vXNXwMwrLKdCZ4voBYZpSWII1DOeOh6x2s-W9SUzv0_ETqrhJQW1T88L0u_7sldRIBBewPYmQQBw",
+   "why": "integers above 2^53-1 are not exactly representable in every language (Go int64 vs JS double)"
+  },
+  {
+   "expect": [
+    "invalid_token"
+   ],
+   "name": "payload_duplicate_member",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjEsImV4cCI6MTgwMDAwMDg0MCwiaWF0IjoxNzk5OTk5OTQwLCJpc3MiOiJkZWxjcmVkIiwianRpIjoianRpLTAwMDEiLCJraW5kIjoiZGVsZWdhdGlvbiIsIm5iZiI6MTc5OTk5OTk0MCwic2NvcGUiOiJjdXN0b21lcnM6cmVhZCBpbnZvaWNlczpyZWFkIiwic3ViIjoidV9hbGljZSIsInVzZXJfaXNzIjoiZGVsY3JlZCJ9.Bv_vh3lqfEXF1drjJA5d0ththld-f1M8WZjL4n2wh_whvMLzEXC9GY6_4LzsT72V4D9g6g9ErX1xsrqfP_ynAA",
+   "why": "duplicate JSON members are ambiguous (languages keep first or last)"
+  },
+  {
+   "expect": [
+    "invalid_token"
+   ],
+   "name": "payload_nan_literal",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOk5hTiwiaWF0IjoxNzk5OTk5OTQwLCJpc3MiOiJkZWxjcmVkIiwianRpIjoianRpLTAwMDEiLCJraW5kIjoiZGVsZWdhdGlvbiIsIm5iZiI6MTc5OTk5OTk0MCwic2NvcGUiOiJjdXN0b21lcnM6cmVhZCBpbnZvaWNlczpyZWFkIiwic3ViIjoidV9hbGljZSIsInVzZXJfaXNzIjoiZGVsY3JlZCJ9.bxlIGvv3hwUKg8HKaBhua-E2IfSi499R-J3B7wbjmYJA7tPLoB3GgHkle-wKbLcV4aY1Mrw_77zxe6odbpmiBg",
+   "why": "NaN/Infinity are not JSON"
+  },
+  {
+   "expect": [
+    "invalid_token"
+   ],
+   "name": "payload_too_deeply_nested",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQiLCJ4IjpbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXX0.36cVmILlvfJii-2g0QD8u9I4Z1QVjSTPzJZHjGuni5-t7KJEL4FnH_d0-jzN0XIynhOZcgPZ2RbCph49WepEBw",
+   "why": "nesting deeper than 32 levels is refused"
+  },
+  {
+   "expect": [
+    "invalid_token"
+   ],
+   "name": "chain_null_explicit",
+   "request": {
+    "bulletin": null,
+    "dpop": null,
+    "now": 1800000000,
+    "repeat": 1,
+    "require_bulletin": false,
+    "required_scopes": null,
+    "resource": "https://api.acme.test/v1"
+   },
+   "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IkdZdVQ5cU9aX2p3ZzNHc0NCMmRRa1dLR21lZ1JTeEFfQ0l2eHVVNDlVU28iLCJ0eXAiOiJhdCtqd3QifQ.eyJhY3QiOnsic3ViIjoiYmlsbGluZy1hZ2VudCJ9LCJhdWQiOiJodHRwczovL2FwaS5hY21lLnRlc3QvdjEiLCJleHAiOjE4MDAwMDA4NDAsImlhdCI6MTc5OTk5OTk0MCwiaXNzIjoiZGVsY3JlZCIsImp0aSI6Imp0aS0wMDAxIiwia2luZCI6ImRlbGVnYXRpb24iLCJuYmYiOjE3OTk5OTk5NDAsInNjb3BlIjoiY3VzdG9tZXJzOnJlYWQgaW52b2ljZXM6cmVhZCIsInN1YiI6InVfYWxpY2UiLCJ1c2VyX2lzcyI6ImRlbGNyZWQiLCJjaGFpbiI6bnVsbH0.uPCsGXwd1A6pcrrBt4ZCsaWvXmHt3gVm3PCHtz6qPr_pptT4DJbfjcIHNLHmxe87_oXvfwpLLsQARrXq3a9rDw",
+   "why": "chain, when present, must be a list; null is not a list"
+  },
+  {
+   "expect": [
+    "invalid_token"
+   ],
    "name": "exp_missing",
    "request": {
     "bulletin": null,

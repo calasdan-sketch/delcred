@@ -223,6 +223,21 @@ def decode_unverified(token: str) -> dict[str, Any]:
         raise InvalidToken(f"malformed token: {e}") from e
 
 
+def _signer_among(token: str, candidates):
+    """Return the first candidate public key whose signature verifies, else None."""
+    from . import _jws
+
+    try:
+        _h, _p, signing_input, sig = _jws.parse_compact(token)
+    except _jws.JWSError:
+        return None
+    for key in candidates:
+        x = _jws.b64url_encode(key.public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw))
+        if _jws.ed25519_verify(x, signing_input, sig):
+            return key
+    return None
+
+
 def _key_for_issuer(
     token: str, base: Path | None, allow_external: bool = False
 ) -> tuple[bytes, list[str], Any, Any]:
@@ -259,7 +274,14 @@ def _key_for_issuer(
     if iss == ISSUER_ID:
         pub = _keys.load_public(base)
         kid = headers.get("kid")
-        if kid is not None and kid != _keys.key_id(pub):
+        if kid is None:
+            # Tokens minted by delcred 0.2.0 carry no ``kid``. After a rotation
+            # with an overlap window, find the key that actually signed it
+            # (signature check only; claims/expiry are checked afterwards).
+            retired = _keys.retired_keys(base)
+            if retired:
+                pub = _signer_among(token, [pub, *retired.values()]) or pub
+        elif kid != _keys.key_id(pub):
             # Rotated with an overlap window? Retired keys still verify.
             old = _keys.retired_keys(base).get(kid) if isinstance(kid, str) else None
             if old is None:

@@ -15,7 +15,7 @@
   `DPoP` scheme and challenge, `/token` `DPoP` header. Bound tokens fail closed
   without a proof; the proof is checked before revocation and single-use burn.
 - **Offline verifier + spec + vectors:** `delcred.offline.verify_offline`,
-  `spec/VERIFICATION.md`, 89 deterministic vectors (`delcred vectors`),
+  `spec/VERIFICATION.md`, 96 deterministic vectors (`delcred vectors`),
   dependency-free Node and Go verifiers, `delcred offline-verify`.
 - **Signed revocation bulletin:** `delcred revocations export`,
   `GET /revocations.jwt`, `delcred.bulletin`.
@@ -44,6 +44,25 @@
   `exp` values or raise `TypeError`).
 - User/agent ids with control, bidi, zero-width or whitespace characters are
   refused at mint and exchange (terminal-escape injection into logs).
+
+### Round 5 (expert-2, cross-language and upgrade review)
+
+- **Fixed (upgrade path): tokens minted by delcred 0.2.0 stopped verifying after
+  `delcred key rotate --keep-old`.** 0.2.0 tokens carry no `kid`, and the verifier
+  only tried the current key. It now finds the signing key among the current and
+  still-valid retired keys. A hard-cut rotation still invalidates them; a token
+  signed by any other key is still refused.
+- **Fixed (verifiers disagreed):** a differential fuzz of 32,000 mutated tokens
+  found the Python, Node and Go verifiers disagreeing on JSON edge cases. Now all
+  three agree and the spec says so: duplicate members, `NaN`/`Infinity`, nesting
+  deeper than 32, whole-valued floats (`1800000840.0`), exponents, integers above
+  2^53-1 and `"chain": null` are all `invalid_token`. The Node verifier also
+  crashed on a non-string header `typ`; fixed. 7 new vectors (96 total).
+- Changed: `delcred audit verify` explains "unhashed entry inside the chain" (an
+  older delcred still writing to the same home after an upgrade).
+- Added: `delcred.__author__`; `hypothesis` in the `dev` extra; `tests/test_round5.py`
+  (property, mutation-style, differential, golden-shape and author-pin tests).
+- Author/maintainer everywhere is "Calas Automations Inc." (already the case; now pinned by a test).
 
 ### Round 3 (expert-2, second review)
 

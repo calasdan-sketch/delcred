@@ -1,9 +1,14 @@
-# Publish checklist for delcred (written for Dan; nothing here has been run)
+# Publish checklist for delcred (written for Dan; nothing here has been run by Claude)
 
 **Version to release: 0.4.0.** PyPI has only 0.2.0. 0.3.0 was never uploaded, so
 0.4.0 contains both 0.3.0 and 0.4.0 work. It is a breaking release compared with
 0.2.0 (the CHANGELOG "Breaking (security)" list says what changes), which is
 fine for a 0.x version.
+
+Round 5 change you should know about: tokens made by the old 0.2.0 now keep
+working after `key rotate --keep-old`, and the Node/Go checkers now agree with
+the Python one on odd JSON (see `docs/ROUND5.md`). Run `pip install -e ".[dev]"`
+before `pytest` so the property tests (they need `hypothesis`) run.
 
 ## Check first (5 minutes)
 

@@ -44,7 +44,65 @@ func b64(s string) ([]byte, error) {
 	return base64.RawURLEncoding.Strict().DecodeString(s)
 }
 
+const (
+	maxSafeInt   = 1<<53 - 1
+	maxJSONDepth = 32
+)
+
+// strictScan rejects duplicate object members and nesting deeper than maxJSONDepth
+// (encoding/json would silently keep the last duplicate).
+func strictScan(raw []byte) bool {
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.UseNumber()
+	type frame struct {
+		isObj   bool
+		expKey  bool
+		members map[string]bool
+	}
+	var stack []frame
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			return true // io.EOF or a syntax error: the real decode reports it
+		}
+		if len(stack) > 0 {
+			top := &stack[len(stack)-1]
+			if _, isDelim := t.(json.Delim); !isDelim && top.isObj && top.expKey {
+				k, ok := t.(string)
+				if !ok {
+					return true
+				}
+				if top.members[k] {
+					return false
+				}
+				top.members[k] = true
+				top.expKey = false
+				continue
+			}
+		}
+		if d, ok := t.(json.Delim); ok {
+			switch d {
+			case '{', '[':
+				if len(stack) >= maxJSONDepth {
+					return false
+				}
+				stack = append(stack, frame{isObj: d == '{', expKey: d == '{', members: map[string]bool{}})
+				continue
+			case '}', ']':
+				stack = stack[:len(stack)-1]
+			}
+		}
+		// a value finished: the next token in an object is a key again
+		if len(stack) > 0 && stack[len(stack)-1].isObj {
+			stack[len(stack)-1].expKey = true
+		}
+	}
+}
+
 func jsonObj(raw []byte, what string) (obj, error) {
+	if !strictScan(raw) {
+		return nil, rej(what + " has a duplicate member or is nested too deeply")
+	}
 	dec := json.NewDecoder(bytes.NewReader(raw))
 	dec.UseNumber()
 	var v any
@@ -126,7 +184,7 @@ func asInt(v any) (int64, bool) {
 		return 0, false
 	}
 	i, err := n.Int64()
-	if err != nil || strings.ContainsAny(n.String(), ".eE") {
+	if err != nil || strings.ContainsAny(n.String(), ".eE") || i > maxSafeInt || i < -maxSafeInt {
 		return 0, false
 	}
 	return i, true

@@ -12,7 +12,7 @@ import base64
 import binascii
 import json
 import re
-from typing import Any
+from typing import Any, TypeGuard
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
@@ -49,6 +49,31 @@ def b64url_decode(text: str) -> bytes:
     return raw
 
 
+MAX_SAFE_INT = 2**53 - 1
+
+
+def is_safe_int(v: Any) -> TypeGuard[int]:
+    """A JSON integer every language can hold exactly: not bool, |v| <= 2**53 - 1."""
+    return isinstance(v, int) and not isinstance(v, bool) and abs(v) <= MAX_SAFE_INT
+
+
+def _no_constant(name: str):
+    raise ValueError(f"{name} is not valid JSON")
+
+
+MAX_JSON_DEPTH = 32
+
+
+def _check_depth(obj: Any, what: str) -> None:
+    stack: list[tuple[Any, int]] = [(obj, 1)]
+    while stack:
+        v, d = stack.pop()
+        if isinstance(v, (dict, list)):
+            if d > MAX_JSON_DEPTH:
+                raise JWSError(f"{what} is nested deeper than {MAX_JSON_DEPTH} levels")
+            stack.extend((c, d + 1) for c in (v.values() if isinstance(v, dict) else v))
+
+
 def _json_object(raw: bytes, what: str) -> dict[str, Any]:
     def no_dups(pairs):
         d: dict[str, Any] = {}
@@ -59,11 +84,12 @@ def _json_object(raw: bytes, what: str) -> dict[str, Any]:
         return d
 
     try:
-        obj = json.loads(raw.decode("utf-8"), object_pairs_hook=no_dups)
-    except (UnicodeDecodeError, json.JSONDecodeError, RecursionError) as e:
+        obj = json.loads(raw.decode("utf-8"), object_pairs_hook=no_dups, parse_constant=_no_constant)
+    except (UnicodeDecodeError, ValueError, RecursionError) as e:  # JSONDecodeError is a ValueError
         raise JWSError(f"{what} is not valid UTF-8 JSON") from e
     if not isinstance(obj, dict):
         raise JWSError(f"{what} is not a JSON object")
+    _check_depth(obj, what)
     return obj
 
 

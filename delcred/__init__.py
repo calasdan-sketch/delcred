@@ -38,6 +38,7 @@ from .tokens import ExpiredToken, InsufficientScope, InvalidToken, TokenError
 from .trust import TrustConfigError, add_trusted_issuer, trusted_issuers
 
 __version__ = "0.4.0"
+__author__ = "Calas Automations Inc."
 __all__ = [
     "DEFAULT_TTL",
     "TOKEN_TYPE_BROKER_KEY",
@@ -50,6 +51,7 @@ __all__ = [
     "PolicyError",
     "TokenError",
     "TrustConfigError",
+    "__author__",
     "__version__",
     "agent_token",
     "attenuate",

@@ -2,7 +2,7 @@
 
 How a resource server in **any language** verifies a delcred delegation token
 using only the issuer's public keys. Reference implementation:
-`delcred/offline.py`. Conformance: `spec/vectors/vectors.json` (89 cases);
+`delcred/offline.py`. Conformance: `spec/vectors/vectors.json` (96 cases);
 Node and Go verifiers in `spec/verifiers/` pass all of them.
 
 ## Inputs
@@ -18,17 +18,20 @@ Node and Go verifiers in `spec/verifiers/` pass all of them.
 ## Algorithm (first failing step wins; the code is part of the contract)
 
 1. **Structure** — at most 16384 bytes; exactly three non-empty base64url
-   segments in canonical form (no `=` padding, trailing bits zero: decode then re-encode must reproduce the text); header and payload are UTF-8 JSON objects.
+   segments in canonical form (no `=` padding, trailing bits zero: decode then re-encode must reproduce the text); header and payload are UTF-8 JSON objects
+   **parsed strictly**: a duplicate member name anywhere, `NaN`/`Infinity`, trailing data, or nesting deeper than 32 levels is `invalid_token` (languages disagree on which duplicate wins).
    Failure: `invalid_token`.
 2. **Header** — `alg` is exactly `EdDSA`; none of `jwk jku x5u x5c x5t x5t#S256
    crit` is present; `typ` equals `at+jwt` or `application/at+jwt`
-   (case-insensitive); `kid` is present and names a JWKS key
+   (case-insensitive); `kid` is present and names a JWKS key (tokens from delcred 0.2.0 have no `kid`; only the Python library, not this spec, still verifies those, and only on the issuer host)
    (`kty=OKP, crv=Ed25519`, `use` absent or `sig`, `alg` absent or `EdDSA`).
    Failure: `invalid_token`.
 3. **Signature** — Ed25519 over the ASCII bytes `header_b64 "." payload_b64`;
    signature is 64 bytes. Failure: `invalid_token`.
 4. **Claims shape** — `iss == "delcred"`; `exp`, `nbf`, `iat` are JSON integers
-   (floats and strings rejected). Failure: `invalid_token`.
+   (floats and strings rejected). "Integer" is decided by the **lexeme**, not the value:
+   `1800000840.0` and `1.80000084e9` are floats; integers beyond +-(2^53 - 1) are
+   rejected (Go `int64` and JavaScript doubles would disagree). Failure: `invalid_token`.
 5. **Time** — `now > exp + 60` → `expired`; `now < nbf - 60` → `not_yet_valid`.
 6. **Delegation shape** — `kind == "delegation"`; `sub`, `jti` non-empty
    strings; `act` is a nested object chain (`{"sub": leaf, "act": {"sub": parent}}`),

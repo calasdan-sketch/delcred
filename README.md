@@ -7,7 +7,7 @@ key so a leaked token is useless (DPoP), and expire in minutes. Agents can hand
 sub-agents a *narrower* copy but never a broader one. Revoke the agent without
 locking out the human. Every issue, use and revocation lands in a
 tamper-evident audit log, and any language can verify tokens offline against a
-published spec and 89 test vectors. Take a grant out of the policy and
+published spec and 96 test vectors. Take a grant out of the policy and
 already-minted tokens can die with it (`verify --check-policy`).
 
 One `pip install`, three small dependencies (PyJWT, cryptography, PyYAML), no
@@ -160,7 +160,7 @@ RFC 9449 `DPoP` challenge. `POST /token` accepts a `DPoP` header (or
 
 ## Verify from any language (offline) + revocation that third parties see
 
-`spec/VERIFICATION.md` is the verifier spec; `spec/vectors/vectors.json` has 89
+`spec/VERIFICATION.md` is the verifier spec; `spec/vectors/vectors.json` has 96
 cases (alg confusion, embedded-key headers, `crit`, NBSP-in-scope, leeway
 boundaries, chains, DPoP, bulletins). Dependency-free Node
 (`spec/verifiers/node`) and Go (`spec/verifiers/go`) verifiers pass all of
@@ -583,4 +583,4 @@ MIT — Calas Automations Inc. See [LICENSE](LICENSE).
 
 ---
 
-Release notes: `CHANGELOG.md`. Review history and what was *not* done: `docs/ROUND4.md`. Release steps for the maintainer: `PUBLISH-CHECKLIST.md`.
+Release notes: `CHANGELOG.md`. Review history and what was *not* done: `docs/ROUND4.md` and `docs/ROUND5.md`. Release steps for the maintainer: `PUBLISH-CHECKLIST.md`.
