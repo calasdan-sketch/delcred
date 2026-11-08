@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from . import tokens
-from ._common import DEFAULT_TTL, home
+from ._common import DEFAULT_TTL, ISSUER_ID, home
 from .audit import AuditLog
 from .broker import Broker
 from .policy import PolicyError
@@ -88,6 +88,11 @@ def exchange(
         audit.record("exchange_failed", reason="subject_is_agent_token")
         raise ExchangeError("subject_token must identify a user, not an agent")
     _require_kind(act_claims, "agent", "actor")
+    # Agent identities are operator-asserted by this delcred home only; a
+    # trusted external IdP must not be able to mint actor tokens.
+    if act_claims.get("iss") != ISSUER_ID:
+        audit.record("exchange_failed", reason="actor_not_local_issuer")
+        raise ExchangeError(f"actor_token must be issued by {ISSUER_ID!r}")
     user = sub_claims["sub"]
     agent = act_claims["sub"]
 

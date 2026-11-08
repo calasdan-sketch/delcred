@@ -187,11 +187,6 @@ def _key_for_issuer(token: str, base: Path | None) -> tuple[bytes, list[str], st
         serialization.PublicFormat.SubjectPublicKeyInfo,
     )
     return pem, ["exp", "iss", "sub"], iss
-    """Decode claims without verifying — for inspection only, never trust."""
-    try:
-        return jwt.decode(token, options={"verify_signature": False})
-    except jwt.PyJWTError as e:
-        raise InvalidToken(f"malformed token: {e}") from e
 
 
 def verify_signature(
@@ -242,10 +237,19 @@ def verify_delegation_token(
 ) -> dict[str, Any]:
     """Verify a delegation token and enforce audience pinning (confused-deputy defense)."""
     claims = verify_signature(token, leeway=leeway, base=base)
+    # Only this issuer mints delegations. A trusted external IdP may assert
+    # *users*, never delegations — otherwise its tokens would bypass policy.
+    if claims.get("iss") != ISSUER_ID:
+        raise InvalidToken(
+            f"delegation tokens must be issued by {ISSUER_ID!r}, "
+            f"not {claims.get('iss')!r}"
+        )
     if claims.get("kind") != "delegation":
         raise InvalidToken(f"not a delegation token (kind={claims.get('kind')!r})")
     if "act" not in claims or "sub" not in claims["act"]:
         raise InvalidToken("delegation token missing act.sub (agent identity)")
+    if jwt.get_unverified_header(token).get("typ") != "at+jwt":
+        raise InvalidToken("not a delegation token (typ must be 'at+jwt')")
     if expected_resource is not None and claims.get("aud") != expected_resource:
         raise InvalidToken(
             f"audience mismatch: token is for {claims.get('aud')!r}, "

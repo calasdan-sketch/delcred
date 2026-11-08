@@ -182,3 +182,41 @@ def test_trust_add_rejects_malicious_issuer_string(home, idp_keypair):
     _, pub_path = idp_keypair
     with pytest.raises(TrustConfigError):
         delcred.trust_add('https://evil.example.com":\n  "x', str(pub_path), base=home)
+
+
+def test_external_issuer_cannot_mint_delegations(home, idp_keypair):
+    """A trusted IdP asserts users only; its kind=delegation tokens must not verify."""
+    priv_pem, pub_path = idp_keypair
+    delcred.trust_add(IDP_ISS, str(pub_path), base=home)
+    forged = jwt.encode(
+        {
+            "iss": IDP_ISS, "sub": "u_alice", "act": {"sub": "billing-agent"},
+            "kind": "delegation", "aud": "https://api.acme.test/v1",
+            "scope": "invoices:read", "iat": int(time.time()), "exp": int(time.time()) + 300,
+        },
+        priv_pem, algorithm="EdDSA", headers={"typ": "at+jwt"},
+    )
+    with pytest.raises(InvalidToken, match="must be issued by"):
+        delcred.verify(forged, expected_resource="https://api.acme.test/v1", base=home)
+
+
+def test_external_issuer_cannot_assert_agents(home, subject, idp_keypair):
+    priv_pem, pub_path = idp_keypair
+    delcred.trust_add(IDP_ISS, str(pub_path), base=home)
+    ext_actor = _idp_token(priv_pem, sub="billing-agent", kind="agent")
+    with pytest.raises(ExchangeError, match="actor_token must be issued by"):
+        exchange(
+            subject_token=subject,
+            actor_token=ext_actor,
+            scope="invoices:read",
+            resource="https://api.acme.test/v1",
+            base=home,
+        )
+
+
+def test_delegate_rejects_mismatched_user_assertion(home, subject, actor):
+    with pytest.raises(ExchangeError, match="does not match"):
+        delcred.delegate(
+            user="u_bob", scope="invoices:read", resource="https://api.acme.test/v1",
+            user_token=subject, agent_token=actor, base=home,
+        )

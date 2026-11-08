@@ -1,8 +1,14 @@
 """Shared fixtures: isolated delcred home per test."""
 
+import sys
+
 import pytest
 
-import delcred
+if sys.platform == "win32":
+    # delcred is Linux/macOS only (fcntl locks, POSIX perms) — see README.
+    collect_ignore_glob = ["test_*.py"]
+else:
+    import delcred
 
 
 @pytest.fixture

@@ -10,6 +10,10 @@ This is **market-gap #1 (Agent Identity & Delegated Credentials) merged with
 delegation: agents get *capability-shaped* credentials (a scoped JWT or an
 opaque `dk_…` key), never the underlying secret.
 
+**Platform: Linux and macOS only.** delcred relies on `fcntl` file locks and
+POSIX `0600` permission checks; on Windows `import delcred` raises a clear
+`ImportError` (and the test suite is skipped).
+
 ```
 pip install delcred
 delcred init
@@ -25,8 +29,6 @@ delcred user-token u_alice > /tmp/user.jwt        # dev only; prod uses your IdP
 
 # 2. exchange → delegation (RFC 8693 style).
 #    Prefer files/env over CLI args — command lines are visible in `ps`.
-delcred agent-token billing-agent > /tmp/agent.jwt
-delcred user-token u_alice > /tmp/user.jwt        # dev only; prod uses your IdP's JWT
 delcred exchange --subject-token-file /tmp/user.jwt \
                  --actor-token-file   /tmp/agent.jwt \
                  --scope "invoices:read" --resource https://api.acme.test/v1
@@ -71,7 +73,9 @@ trusted_issuers:
 
 Notes: the local issuer (`iss: delcred`) can never be shadowed by this
 registry; unknown issuers are rejected; a trusted token with `kind: agent`
-is still refused as a subject (no token laundering).
+is still refused as a subject (no token laundering). Trusted IdPs vouch for
+*users* only: actor (agent) tokens and delegation tokens are accepted only
+from the local issuer, so an IdP cannot mint around your policy.
 
 ## Library (5 lines)
 

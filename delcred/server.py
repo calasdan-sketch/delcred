@@ -56,9 +56,13 @@ class _Handler(BaseHTTPRequestHandler):
         if not length:
             return {}
         try:
-            return json.loads(self.rfile.read(length) or b"{}")
+            body = json.loads(self.rfile.read(length) or b"{}")
         except json.JSONDecodeError:
             return {}
+        if not isinstance(body, dict):
+            self._send(400, {"error": "JSON body must be an object"})
+            return None
+        return body
 
     def _send(self, code: int, obj: dict) -> None:
         body = json.dumps(obj).encode()

@@ -14,7 +14,15 @@ Five-line happy path::
 
 from __future__ import annotations
 
-from pathlib import Path
+import sys
+
+if sys.platform == "win32":
+    raise ImportError(
+        "delcred supports Linux and macOS only: it relies on fcntl file locks "
+        "and POSIX 0600 permission checks for its keys and state files"
+    )
+
+from pathlib import Path  # noqa: E402
 from typing import Any
 
 from . import keys, policy, tokens
@@ -90,7 +98,14 @@ def delegate(
     ttl: int = DEFAULT_TTL,
     base: Path | None = None,
 ) -> str:
-    """Mint a delegation JWT via RFC 8693 exchange. Returns the token."""
+    """Mint a delegation JWT via RFC 8693 exchange. Returns the token.
+
+    ``user``/``agent`` are optional assertions: if given, they must match the
+    ``sub`` of ``user_token``/``agent_token`` or ExchangeError is raised.
+    """
+    for want, tok, role in ((user, user_token, "user"), (agent, agent_token, "agent")):
+        if want is not None and tokens.decode_unverified(tok).get("sub") != want:
+            raise ExchangeError(f"{role}={want!r} does not match the {role} token's sub")
     result = _exchange(
         subject_token=user_token,
         actor_token=agent_token,
