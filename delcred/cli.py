@@ -185,6 +185,75 @@ def cmd_status(args):
     print(f"broker records:     {len(Broker(h)._records())}")
 
 
+def _doctor_issues(h: Path) -> list[str]:
+    """Read-only lint of a delcred home. Returns human-readable issues."""
+    import stat
+    from urllib.parse import urlsplit
+
+    import yaml
+
+    from delcred._common import MAX_TTL
+    from delcred.trust import TrustConfigError, trusted_issuer_algs
+
+    issues = []
+    mode = stat.S_IMODE(h.stat().st_mode)
+    if mode & 0o077:
+        issues.append(f"home {h} is {oct(mode)}; should be 0700")
+    priv, _ = _keys.key_paths(h)
+    if not priv.exists():
+        issues.append(f"{priv} missing; run `delcred init`")
+    elif stat.S_IMODE(priv.stat().st_mode) & 0o077:
+        issues.append(f"{priv} is {oct(stat.S_IMODE(priv.stat().st_mode))}; should be 0600")
+    pp = policy_path(h)
+    try:
+        data = yaml.safe_load(pp.read_text()) if pp.exists() else {}
+    except yaml.YAMLError as e:
+        return issues + [f"{pp} does not parse: {e}"]
+    data = data if isinstance(data, dict) else {}
+    for i, g in enumerate(data.get("grants") or []):
+        if not isinstance(g, dict):
+            issues.append(f"grant #{i + 1} is not a mapping")
+            continue
+        who = f"grant #{i + 1} ({g.get('user')}/{g.get('agent')})"
+        resources = g.get("resources") or []
+        if not resources:
+            issues.append(f"{who}: resources is empty (nothing can be minted, or a typo)")
+        for r in resources:
+            u = urlsplit(str(r))
+            if "*" in str(r) or u.scheme not in ("http", "https") or not u.netloc:
+                issues.append(f"{who}: resource {r!r} is not an exact http(s) URL")
+        for sc in g.get("scopes") or []:
+            if "*" in str(sc):
+                issues.append(f"{who}: scope {sc!r} contains '*' (scopes match exactly)")
+        ttl = g.get("max_ttl", MAX_TTL)
+        if not isinstance(ttl, int) or isinstance(ttl, bool) or not 0 < ttl <= MAX_TTL:
+            issues.append(f"{who}: max_ttl {ttl!r} must be an integer in 1..{MAX_TTL}")
+        if not isinstance(g.get("single_use", False), bool):
+            issues.append(f"{who}: single_use {g.get('single_use')!r} must be true or false")
+    try:
+        trusted_issuer_algs(h)
+    except TrustConfigError as e:
+        issues.append(str(e))
+    audit = h / "audit.jsonl"
+    if audit.exists() and not (audit.is_file() and os.access(audit, os.W_OK)):
+        issues.append(f"audit log {audit} is not a writable file")
+    elif not audit.exists() and not os.access(h, os.W_OK):
+        issues.append(f"audit log {audit} cannot be created ({h} not writable)")
+    return issues
+
+
+def cmd_doctor(args):
+    h = Path(args.home or os.environ.get("DELCRED_HOME", Path.home() / ".delcred"))
+    if not h.is_dir():
+        print(f"no delcred home at {h}; run `delcred init`", file=sys.stderr)
+        sys.exit(2)
+    issues = _doctor_issues(h)
+    for msg in issues:
+        print(f"ISSUE: {msg}")
+    print(f"{len(issues)} issue(s) in {h}" if issues else f"OK: {h}")
+    sys.exit(1 if issues else 0)
+
+
 def cmd_trust_add(args):
     from delcred.trust import TrustConfigError, add_trusted_issuer
 
@@ -358,6 +427,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     s.add_argument("--agent-token-file", help="file containing the sidecar's agent token")
     s.set_defaults(func=cmd_sidecar)
+
+    s = sub.add_parser("doctor", help="read-only check of home perms, policy and trust config")
+    s.set_defaults(func=cmd_doctor)
 
     s = sub.add_parser(
         "trust-add", help="trust an external IdP's subject tokens (by issuer)"

@@ -176,6 +176,12 @@ Dry-run: `delcred policy check --user u_alice --agent billing-agent --scope invo
 
 ## Limitations (read before production)
 
+Run `delcred doctor` first: a read-only check of home (0700) and issuer key
+(0600) permissions, policy syntax, grants (exact http(s) resource URLs, no
+`*` scopes, `max_ttl` within 3600, boolean `single_use`), trusted-issuer key
+files, and audit-log writability. Exit 0 = clean, 1 = issues, 2 = no home.
+It checks configuration only; it does not prove your grants are the right ones.
+
 1. **Bearer tokens.** Delegation JWTs and `dk_…` keys are bearer credentials:
    anyone holding one can use it until it expires. Mitigations shipped: 15-min
    default TTL, single-use option, resource pinning, instant local revocation.
