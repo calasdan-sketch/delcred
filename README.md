@@ -48,6 +48,14 @@ delcred revoke --agent billing-agent --reason "suspected prompt injection"
 
 ## External IdPs (production subject tokens)
 
+**Compatibility first:** trusted IdP subject tokens must be signed with
+**EdDSA (Ed25519), RS256 or ES256**, one algorithm pinned per issuer. Okta,
+Auth0 and Microsoft Entra sign with RS256: register them with `--alg RS256`.
+delcred does **not** fetch JWKS URLs: export the IdP's current signing key as
+a PEM file. Only one key per issuer is held, so when your IdP rotates its
+signing key, tokens signed with the new key are rejected until you re-run
+`trust-add` with it.
+
 delcred is **not** an IdP — it never does login or OAuth flows. But it
 accepts your IdP's user JWTs as `subject_token`: register the issuer once
 (its public key and the one algorithm it signs with), then pass the IdP's
@@ -187,8 +195,13 @@ Dry-run: `delcred policy check --user u_alice --agent billing-agent --scope invo
 5. **`delcred serve` binds localhost without auth.** Put TLS + authentication
    in front before exposing it; anyone who can reach `/exchange` can mint
    within policy.
-6. **No chained delegation.** `may_act` (agent→sub-agent) is deferred to v2.
-7. **Clock skew.** 60s leeway is assumed; larger drift breaks verification.
+6. **External IdPs: one static key per issuer, no JWKS.** EdDSA, RS256 and
+   ES256 subject tokens are accepted (one alg pinned per issuer). Keys are
+   PEM files you export; delcred does not fetch or rotate JWKS, so an IdP key
+   rotation needs a fresh `trust-add`. Other algorithms (PS256, ES384, HS*)
+   are rejected.
+7. **No chained delegation.** `may_act` (agent→sub-agent) is deferred to v2.
+8. **Clock skew.** 60s leeway is assumed; larger drift breaks verification.
 
 ## Development
 
