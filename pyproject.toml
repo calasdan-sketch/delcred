@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "delcred"
-version = "0.2.0"
+version = "0.2.1"
 description = "Short-lived, per-task, per-user-scoped credentials for AI agents — RFC 8693 delegation + ephemeral API-key broker"
 readme = "README.md"
 license = { text = "MIT" }

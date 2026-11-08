@@ -45,7 +45,7 @@ from .revocation import RevocationList
 from .tokens import ExpiredToken, InvalidToken, TokenError
 from .trust import TrustConfigError, add_trusted_issuer, trusted_issuers
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 __all__ = [
     "DEFAULT_TTL",
     "TOKEN_TYPE_BROKER_KEY",

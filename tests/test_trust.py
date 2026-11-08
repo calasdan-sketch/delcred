@@ -184,8 +184,9 @@ def test_trust_add_rejects_malicious_issuer_string(home, idp_keypair):
         delcred.trust_add('https://evil.example.com":\n  "x', str(pub_path), base=home)
 
 
-def test_external_issuer_cannot_mint_delegations(home, idp_keypair):
-    """A trusted IdP asserts users only; its kind=delegation tokens must not verify."""
+def test_idp_bypass_regression_0_2_0(home, idp_keypair):
+    """0.2.0 bypass: a trusted IdP could sign kind=delegation tokens that verified
+    with no policy grant. A trusted IdP asserts users only."""
     priv_pem, pub_path = idp_keypair
     delcred.trust_add(IDP_ISS, str(pub_path), base=home)
     forged = jwt.encode(
