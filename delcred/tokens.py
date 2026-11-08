@@ -1,5 +1,8 @@
 """JWT minting and strict verification (EdDSA / Ed25519).
 
+Local tokens are always EdDSA. Trusted external IdPs may be pinned to RS256
+or ES256 for subject tokens only (see ``trust.py``).
+
 Claim model (RFC 8693-flavoured)::
 
     iss:      "delcred"                      # this issuer
@@ -139,14 +142,15 @@ def decode_unverified(token: str) -> dict[str, Any]:
         raise InvalidToken(f"malformed token: {e}") from e
 
 
-def _key_for_issuer(token: str, base: Path | None) -> tuple[bytes, list[str], str]:
-    """Select the verification key and required claims from the token's ``iss``.
+def _key_for_issuer(token: str, base: Path | None) -> tuple[bytes, list[str], str, str]:
+    """Select the verification key, required claims and alg from the token's ``iss``.
 
-    Returns ``(public_key_pem, required_claims, issuer)``. The local issuer
-    uses the delcred issuer key with the full claim set; trusted external
-    issuers (IdPs) use their registered Ed25519 key with a minimal claim set
-    (external tokens rarely carry ``jti``/``nbf`` — revocation of users is by
-    ``sub``, which is always required).
+    Returns ``(public_key_pem, required_claims, issuer, alg)``. The local issuer
+    uses the delcred issuer key (EdDSA) with the full claim set; trusted external
+    issuers (IdPs) use their registered key and pinned alg with a minimal claim
+    set (external tokens rarely carry ``jti``/``nbf`` — revocation of users is by
+    ``sub``, which is always required). The token's own ``alg`` header must equal
+    the pinned alg; it never chooses the algorithm.
     """
     from . import trust as _trust
 
@@ -154,10 +158,6 @@ def _key_for_issuer(token: str, base: Path | None) -> tuple[bytes, list[str], st
         headers = jwt.get_unverified_header(token)
     except jwt.PyJWTError as e:
         raise InvalidToken(f"malformed token header: {e}") from e
-    if headers.get("alg") != "EdDSA":
-        raise InvalidToken(
-            f"unexpected alg {headers.get('alg')!r}; only EdDSA accepted"
-        )
     try:
         unverified = jwt.decode(token, options={"verify_signature": False})
     except jwt.PyJWTError as e:
@@ -165,28 +165,38 @@ def _key_for_issuer(token: str, base: Path | None) -> tuple[bytes, list[str], st
     if not isinstance(unverified, dict):
         raise InvalidToken("malformed token: claims are not an object")
     iss = unverified.get("iss")
+
+    def _pin(alg: str) -> None:
+        if headers.get("alg") != alg:
+            raise InvalidToken(
+                f"unexpected alg {headers.get('alg')!r}; issuer {iss!r} accepts {alg} only"
+            )
+
     if iss == ISSUER_ID:
+        _pin("EdDSA")
         pub = _keys.load_public(base)
         pem = pub.public_bytes(
             serialization.Encoding.PEM,
             serialization.PublicFormat.SubjectPublicKeyInfo,
         )
-        return pem, ["exp", "iat", "nbf", "iss", "sub", "jti"], iss
+        return pem, ["exp", "iat", "nbf", "iss", "sub", "jti"], iss, "EdDSA"
     try:
-        trusted = _trust.trusted_issuers(base)
+        trusted = _trust.trusted_issuer_algs(base)
     except _trust.TrustConfigError as e:
         raise InvalidToken(f"bad trusted_issuers config: {e}") from e
-    key = trusted.get(iss) if isinstance(iss, str) else None
-    if key is None:
+    entry = trusted.get(iss) if isinstance(iss, str) else None
+    if entry is None:
         raise InvalidToken(
             f"untrusted issuer {iss!r} — local issuer is {ISSUER_ID!r}; "
             "register external IdPs with `delcred trust-add`"
         )
+    key, alg = entry
+    _pin(alg)
     pem = key.public_bytes(
         serialization.Encoding.PEM,
         serialization.PublicFormat.SubjectPublicKeyInfo,
     )
-    return pem, ["exp", "iss", "sub"], iss
+    return pem, ["exp", "iss", "sub"], iss, alg
 
 
 def verify_signature(
@@ -195,7 +205,7 @@ def verify_signature(
     leeway: int = CLOCK_SKEW_LEEWAY,
     base: Path | None = None,
 ) -> dict[str, Any]:
-    """Strict verification: EdDSA only, issuer pinned, typ checked, expiry/nbf.
+    """Strict verification: one alg per issuer, issuer pinned, expiry/nbf.
 
     The verification key is selected from the token's ``iss``: the local
     delcred issuer key, or a trusted external IdP registered via
@@ -203,12 +213,12 @@ def verify_signature(
 
     Raises TokenError subclasses. Does NOT check revocation (caller does).
     """
-    pub_pem, required, issuer = _key_for_issuer(token, base)
+    pub_pem, required, issuer, alg = _key_for_issuer(token, base)
     try:
         claims = jwt.decode(
             token,
             pub_pem,
-            algorithms=["EdDSA"],
+            algorithms=[alg],
             issuer=issuer,
             leeway=leeway,
             options={

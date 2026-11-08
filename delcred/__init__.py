@@ -191,11 +191,13 @@ def agent_token(agent_id: str, ttl: int = 86400, base: Path | None = None) -> st
     return tokens.mint_agent_token(agent_id, ttl=ttl, base=base or _home())
 
 
-def trust_add(iss: str, key_file: str, base: Path | None = None) -> Path:
-    """Trust an external IdP's subject tokens: register its Ed25519 public key."""
+def trust_add(
+    iss: str, key_file: str, base: Path | None = None, alg: str = "EdDSA"
+) -> Path:
+    """Trust an external IdP's subject tokens: register its public key, pinned to ``alg``."""
     from ._common import home as _home
 
-    return add_trusted_issuer(iss, key_file, base=base or _home())
+    return add_trusted_issuer(iss, key_file, base=base or _home(), alg=alg)
 
 
 def user_token(user_id: str, ttl: int = 3600, base: Path | None = None) -> str:

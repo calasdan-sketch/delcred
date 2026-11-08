@@ -189,7 +189,7 @@ def cmd_trust_add(args):
     from delcred.trust import TrustConfigError, add_trusted_issuer
 
     try:
-        dest = add_trusted_issuer(args.iss, args.key_file, base=_base(args))
+        dest = add_trusted_issuer(args.iss, args.key_file, base=_base(args), alg=args.alg)
     except TrustConfigError as e:
         print(f"trust-add failed: {e}", file=sys.stderr)
         sys.exit(3)
@@ -366,7 +366,13 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument(
         "--key-file",
         required=True,
-        help="PEM file with the issuer's Ed25519 public key",
+        help="PEM file with the issuer's public key (Ed25519, RSA or EC P-256)",
+    )
+    s.add_argument(
+        "--alg",
+        default="EdDSA",
+        choices=["EdDSA", "RS256", "ES256"],
+        help="the one signing alg accepted from this issuer (Okta/Auth0/Entra: RS256)",
     )
     s.set_defaults(func=cmd_trust_add)
 

@@ -50,26 +50,35 @@ delcred revoke --agent billing-agent --reason "suspected prompt injection"
 
 delcred is **not** an IdP — it never does login or OAuth flows. But it
 accepts your IdP's user JWTs as `subject_token`: register the issuer once
-(Ed25519 public key), then pass the IdP's tokens straight into `exchange`:
+(its public key and the one algorithm it signs with), then pass the IdP's
+tokens straight into `exchange`:
 
 ```bash
 delcred trust-add --iss https://idp.example.com --key-file ./idp-pub.pem
-# → copies the key to ~/.delcred/trusted_issuers/ and records the mapping
-#   in policy.yaml under `trusted_issuers:`
+# → EdDSA (Ed25519) issuer; copies the key to ~/.delcred/trusted_issuers/
+#   and records the mapping in policy.yaml under `trusted_issuers:`
+delcred trust-add --iss https://okta.example.com --key-file ./okta-pub.pem --alg RS256
+# → RS256 issuer (RSA >= 2048 bits); --alg ES256 takes an EC P-256 key
 
 delcred exchange --subject-token-file /tmp/idp-user.jwt \
                  --actor-token-file   /tmp/agent.jwt \
                  --scope "invoices:read" --resource https://api.acme.test/v1
 # subject claims come from the IdP token (iss/sub verified against the
-# registered key); only EdDSA tokens are accepted, mirroring local policy.
+# registered key, with that issuer's pinned alg only).
 ```
 
 Or declare it directly in `policy.yaml`:
 
 ```yaml
 trusted_issuers:
-  "https://idp.example.com": "trusted_issuers/idp.pem"   # relative to ~/.delcred
+  "https://idp.example.com": "trusted_issuers/idp.pem"   # EdDSA; relative to ~/.delcred
+  "https://okta.example.com": {key: "trusted_issuers/okta.pem", alg: RS256}
 ```
+
+Each issuer is pinned to exactly one algorithm and the key type must match
+it (checked when the policy loads). A token's own `alg` header never picks
+the algorithm: an RS256 token for an EdDSA issuer, or an HS256 token signed
+with an issuer's public key as the HMAC secret, is rejected.
 
 Notes: the local issuer (`iss: delcred`) can never be shadowed by this
 registry; unknown issuers are rejected; a trusted token with `kind: agent`
@@ -134,8 +143,11 @@ Dry-run: `delcred policy check --user u_alice --agent billing-agent --scope invo
 
 ## Security model
 
-- **Ed25519 only.** Strict `algorithms=["EdDSA"]`, issuer pinned, `typ: at+jwt`.
-  `none`/HS256/RSA confusion rejected.
+- **One algorithm per issuer.** Everything delcred mints (user, agent and
+  delegation tokens) is Ed25519 with strict `algorithms=["EdDSA"]`, issuer
+  pinned, `typ: at+jwt` on delegations. Trusted IdP subject tokens are
+  verified with the single alg pinned to that issuer (EdDSA, RS256 or ES256).
+  `none`/HS256/alg-swap confusion rejected.
 - **Short lifetimes are the primary control:** default 15 min, hard cap 60 min,
   clamped server-side no matter what the requester asks.
 - **Confused-deputy defense:** every token carries an RFC 8707 resource
